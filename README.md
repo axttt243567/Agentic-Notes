@@ -1,6 +1,8 @@
-# agentic-notes-flutter
+# Agentic-Notes
 
-A Flutter-based app prototype featuring an agentic system for creating and organizing academic/self-study notes. The agent generates aesthetic PDF notes (text + images) while helping users track learning goals, progress, and study organization. This MVP demonstrates agentic workflows, memory, and goal-tracking in a student-focused note-making assistant.
+Flutter prototype of an AI-agent note assistant that auto-builds aesthetic PDFs from your study content, embeds images, remembers context, and tracks goals & progress. Shows agentic workflows, memory management, and student-centric organization in an MVP.
+
+This Flutter app demonstrates an agentic system for creating and organizing academic/self-study notes. The agent generates aesthetic PDF notes (text + images) while helping track learning goals, progress, and study organization.
 
 ## Getting Started
 
