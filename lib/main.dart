@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding.dart';
+import 'data/database_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final db = await DatabaseService.init();
+  runApp(DBProvider(database: db, child: const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -47,4 +50,16 @@ class MyApp extends StatelessWidget {
       home: const OnboardingFlow(),
     );
   }
+}
+
+class DBProvider extends InheritedWidget {
+  final DatabaseService database;
+  const DBProvider({super.key, required this.database, required super.child});
+
+  static DatabaseService of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DBProvider>()!.database;
+
+  @override
+  bool updateShouldNotify(covariant DBProvider oldWidget) =>
+      oldWidget.database != database;
 }

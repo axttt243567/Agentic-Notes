@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'home_page.dart';
+import 'main.dart';
+import 'data/models.dart';
 
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});
@@ -36,6 +38,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   Widget build(BuildContext context) {
+    // Prefill from DB (non-blocking, only once)
+    final db = DBProvider.of(context);
+    if (_nameController.text.isEmpty) {
+      final name = db.currentProfile.displayName;
+      _nameController.text = name;
+    }
     final isLast = _index == 2;
 
     return Scaffold(
@@ -80,11 +88,28 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                       ),
                       const Spacer(),
                       FilledButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (!isLast) {
                             _goTo(_index + 1);
                           } else {
-                            // Navigate to the blank HomePage when finishing onboarding.
+                            // Persist to DB then navigate to HomePage.
+                            final name = _nameController.text.trim();
+                            if (name.isNotEmpty) {
+                              await db.setDisplayName(name);
+                            }
+                            if (!context.mounted) return;
+                            final key = _apiKeyController.text.trim();
+                            if (key.isNotEmpty) {
+                              final id = DateTime.now().millisecondsSinceEpoch
+                                  .toString();
+                              await db.upsertApiKey(
+                                ApiKeyModel(id: id, name: 'Gemini', value: key),
+                              );
+                              if (db.currentActiveApiKeyId == null) {
+                                await db.setActiveApiKeyId(id);
+                              }
+                            }
+                            if (!context.mounted) return;
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
                                 builder: (_) => const HomePage(),

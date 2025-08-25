@@ -1,0 +1,655 @@
+import 'package:flutter/material.dart';
+import 'add_api_key_sheet.dart';
+import 'dart:async';
+import '../main.dart';
+import '../data/models.dart';
+
+class ProfileSheet extends StatefulWidget {
+  const ProfileSheet({super.key});
+
+  @override
+  State<ProfileSheet> createState() => _ProfileSheetState();
+}
+
+class _ProfileSheetState extends State<ProfileSheet> {
+  final List<ApiKeyModel> _keys = [];
+  StreamSubscription? _sub;
+  StreamSubscription? _activeSub;
+  String? _activeId;
+  final List<SpaceModel> _spaces = [];
+  StreamSubscription? _spacesSub;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sub?.cancel();
+    _activeSub?.cancel();
+    _spacesSub?.cancel();
+    final db = DBProvider.of(context);
+    _keys
+      ..clear()
+      ..addAll(db.currentApiKeys);
+    _activeId = db.currentActiveApiKeyId;
+    _spaces
+      ..clear()
+      ..addAll(db.currentSpaces);
+    _sub = db.apiKeysStream.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _keys
+          ..clear()
+          ..addAll(list);
+      });
+    });
+    _activeSub = db.activeApiKeyStream.listen((id) {
+      if (!mounted) return;
+      setState(() => _activeId = id);
+    });
+    _spacesSub = db.spacesStream.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _spaces
+          ..clear()
+          ..addAll(list);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _activeSub?.cancel();
+    _spacesSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.8,
+        minChildSize: 0.6,
+        maxChildSize: 0.95,
+        builder: (context, controller) {
+          return Material(
+            color: theme.colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: CustomScrollView(
+              controller: controller,
+              slivers: [
+                SliverToBoxAdapter(child: _grabber()),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  sliver: SliverList.list(
+                    children: [
+                      Text(
+                        'Profile',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _section(
+                        context,
+                        title: 'API Keys',
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Text(
+                                  '${_keys.length} key${_keys.length == 1 ? '' : 's'}',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                              const Spacer(),
+                              InputChip(
+                                label: const Text('+ add'),
+                                onPressed: _addApiKey,
+                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.white10,
+                                side: const BorderSide(color: Colors.white12),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_keys.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.vpn_key_outlined,
+                                    color: Colors.white60,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'No API keys yet',
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                  ),
+                                  InputChip(
+                                    label: const Text('+ add'),
+                                    onPressed: _addApiKey,
+                                    shape: const StadiumBorder(),
+                                    backgroundColor: Colors.white10,
+                                    side: const BorderSide(
+                                      color: Colors.white12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              child: Column(
+                                children: [
+                                  for (int i = 0; i < _keys.length; i++) ...[
+                                    _minimalKeyTile(
+                                      keyData: _keys[i],
+                                      onManage: () => _manageKey(_keys[i], i),
+                                    ),
+                                    if (i < _keys.length - 1)
+                                      const Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: Colors.white12,
+                                        indent: 48,
+                                      ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _section(
+                        context,
+                        title: 'Spaces',
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Text(
+                                  '${_spaces.length} space${_spaces.length == 1 ? '' : 's'}',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                              const Spacer(),
+                              InputChip(
+                                label: const Text('+ new'),
+                                onPressed: _createSpace,
+                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.white10,
+                                side: const BorderSide(color: Colors.white12),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (_spaces.isEmpty)
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final s in const [
+                                  ['💻', 'Programming'],
+                                  ['🧪', 'Chemistry'],
+                                  ['🧮', 'Math'],
+                                  ['🪐', 'Physics'],
+                                  ['🧬', 'Biology'],
+                                  ['🌍', 'Geography'],
+                                ])
+                                  InputChip(
+                                    label: Text('${s[0]} ${s[1]}'),
+                                    onPressed: () =>
+                                        _quickCreateSpace(s[0], s[1]),
+                                    shape: const StadiumBorder(),
+                                    backgroundColor: Colors.white10,
+                                    side: const BorderSide(
+                                      color: Colors.white12,
+                                    ),
+                                  ),
+                              ],
+                            )
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final sp in _spaces)
+                                  InputChip(
+                                    label: Text('${sp.emoji} ${sp.name}'),
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Open spaces from Home. Profile shows list only.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    shape: const StadiumBorder(),
+                                    backgroundColor: Colors.white10,
+                                    side: const BorderSide(
+                                      color: Colors.white12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _section(
+                        context,
+                        title: 'About us',
+                        children: [_aboutCard()],
+                      ),
+                      const SizedBox(height: 16),
+                      _section(
+                        context,
+                        title: 'Suggestions',
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.settings_outlined),
+                            title: const Text('Manage suggestions'),
+                            subtitle: const Text('Opens suggestions settings'),
+                            onTap: () {
+                              // Close profile and signal to open settings on Home
+                              Navigator.of(context).pop('open_suggestions');
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _grabber() => Center(
+    child: Container(
+      width: 40,
+      height: 4,
+      margin: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+      decoration: BoxDecoration(
+        color: Colors.white24,
+        borderRadius: BorderRadius.circular(999),
+      ),
+    ),
+  );
+
+  Widget _section(
+    BuildContext context, {
+    required String title,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: Colors.white70,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...children,
+      ],
+    );
+  }
+
+  void _addApiKey() async {
+    final db = DBProvider.of(context);
+    final res = await showModalBottomSheet<ApiKeyData>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const AddApiKeySheet(),
+    );
+    if (res != null && mounted) {
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      await db.upsertApiKey(
+        ApiKeyModel(id: id, name: res.name, value: res.value),
+      );
+    }
+  }
+
+  Widget _minimalKeyTile({
+    required ApiKeyModel keyData,
+    required VoidCallback onManage,
+  }) {
+    final last4 = keyData.value.length >= 4
+        ? keyData.value.substring(keyData.value.length - 4)
+        : keyData.value;
+    final masked = '•••• •••• •••• $last4';
+    final isActive = keyData.id == _activeId;
+    return ListTile(
+      leading: Icon(
+        isActive ? Icons.check_circle : Icons.vpn_key_outlined,
+        color: isActive ? Colors.lightGreenAccent : Colors.white70,
+      ),
+      title: Text(keyData.name),
+      subtitle: Text(masked, style: const TextStyle(color: Colors.white70)),
+      trailing: InputChip(
+        label: const Text('manage'),
+        avatar: const Icon(Icons.settings_outlined, size: 18),
+        onPressed: onManage,
+        shape: const StadiumBorder(),
+        backgroundColor: Colors.white10,
+        side: const BorderSide(color: Colors.white12),
+      ),
+    );
+  }
+
+  void _manageKey(ApiKeyModel key, int index) async {
+    final db = DBProvider.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final isActive = _activeId == key.id;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(
+                    isActive
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  title: Text(isActive ? 'Currently in use' : 'Use this key'),
+                  onTap: isActive
+                      ? null
+                      : () async {
+                          final navigator = Navigator.of(ctx);
+                          final messenger = ScaffoldMessenger.of(context);
+                          await db.setActiveApiKeyId(key.id);
+                          navigator.maybePop();
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Using "${key.name}"')),
+                          );
+                        },
+                ),
+                if (isActive)
+                  ListTile(
+                    leading: const Icon(Icons.remove_circle_outline),
+                    title: const Text('Stop using this key'),
+                    onTap: () async {
+                      final navigator = Navigator.of(ctx);
+                      await db.clearActiveApiKey();
+                      navigator.maybePop();
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.verified_outlined),
+                  title: const Text('Check'),
+                  subtitle: const Text('UI only'),
+                  onTap: () {
+                    Navigator.of(ctx).maybePop();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Key looks valid (UI only)'),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: const Text('Delete'),
+                  onTap: () async {
+                    Navigator.of(ctx).maybePop();
+                    final ok = await _confirm(
+                      context,
+                      'Delete API key "${key.name}"?',
+                    );
+                    if (ok == true && mounted) {
+                      await db.deleteApiKey(key.id);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _aboutCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: const ListTile(
+        leading: Icon(Icons.info_outline),
+        title: Text('Agentic Notes'),
+        subtitle: Text('A lightweight UI demo. Front-end only.'),
+      ),
+    );
+  }
+
+  Future<bool?> _confirm(BuildContext context, String message) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return ok;
+  }
+
+  Future<void> _createSpace() async {
+    final res = await showModalBottomSheet<_SpaceQuickCreateResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const _CreateSpaceSheet(),
+    );
+    if (res == null || !mounted) return;
+    final db = DBProvider.of(context);
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    await db.upsertSpace(SpaceModel(id: id, name: res.name, emoji: res.emoji));
+  }
+
+  void _quickCreateSpace(String emoji, String name) {
+    final db = DBProvider.of(context);
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    db.upsertSpace(SpaceModel(id: id, name: name, emoji: emoji));
+  }
+}
+
+class _SpaceQuickCreateResult {
+  final String emoji;
+  final String name;
+  const _SpaceQuickCreateResult(this.emoji, this.name);
+}
+
+class _CreateSpaceSheet extends StatefulWidget {
+  const _CreateSpaceSheet();
+
+  @override
+  State<_CreateSpaceSheet> createState() => _CreateSpaceSheetState();
+}
+
+class _CreateSpaceSheetState extends State<_CreateSpaceSheet> {
+  final _nameCtrl = TextEditingController();
+  final _emojiCtrl = TextEditingController(text: '📚');
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emojiCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final insets = MediaQuery.of(context).viewInsets;
+    return Padding(
+      padding: EdgeInsets.only(bottom: insets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Text(
+              'New space',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _emojiCtrl,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      labelText: 'Emoji',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Name',
+                      hintText: 'e.g. Programming',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Cancel'),
+                ),
+                const Spacer(),
+                FilledButton(onPressed: _submit, child: const Text('Create')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final name = _nameCtrl.text.trim();
+    final emoji = _emojiCtrl.text.trim().isEmpty ? '📚' : _emojiCtrl.text;
+    if (name.isEmpty) return;
+    Navigator.of(context).pop(_SpaceQuickCreateResult(emoji, name));
+  }
+}
+
+// legacy private _ApiKey class removed in favor of persistent ApiKeyModel
