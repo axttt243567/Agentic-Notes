@@ -266,16 +266,19 @@ class _ResourcesTab extends StatelessWidget {
         final r = resources[i];
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white10,
+            color: const Color(0xFF0A0A0A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: Color(0xFF2F3336)),
           ),
           child: ListTile(
-            leading: Icon(_iconFor(r.type), color: Colors.white70),
+            leading: Icon(_iconFor(r.type), color: Color(0xFF71767B)),
             title: Text(r.title),
             subtitle: r.url == null
                 ? null
-                : Text(r.url!, style: const TextStyle(color: Colors.white70)),
+                : Text(
+                    r.url!,
+                    style: const TextStyle(color: Color(0xFF71767B)),
+                  ),
             trailing: PopupMenuButton<String>(
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'open', child: Text('Open')),
@@ -374,7 +377,7 @@ class _AddResourceSheetState extends State<_AddResourceSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -532,21 +535,21 @@ class _ActionCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white10,
+            color: const Color(0xFF0A0A0A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: Color(0xFF2F3336)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: Colors.white70),
+              Icon(icon, color: Color(0xFF71767B)),
               const SizedBox(height: 10),
               Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               Text(
                 subtitle,
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                style: const TextStyle(color: Color(0xFF71767B), fontSize: 12),
               ),
             ],
           ),
@@ -565,7 +568,7 @@ class _SectionTitle extends StatelessWidget {
       text,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.w700,
-        color: Colors.white70,
+        color: Color(0xFF71767B),
       ),
     );
   }
@@ -585,8 +588,8 @@ class _SuggestionChips extends StatelessWidget {
             label: Text(c),
             onPressed: () => onSelected(c),
             shape: const StadiumBorder(),
-            backgroundColor: Colors.white10,
-            side: const BorderSide(color: Colors.white12),
+            backgroundColor: Color(0xFF0A0A0A),
+            side: const BorderSide(color: Color(0xFF2F3336)),
           ),
       ],
     );
@@ -610,7 +613,7 @@ class _QuickTestSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -670,9 +673,9 @@ class _MCQState extends State<_MCQ> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: Color(0xFF2F3336)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,8 +687,11 @@ class _MCQState extends State<_MCQ> {
           const SizedBox(height: 8),
           for (var i = 0; i < widget.options.length; i++)
             RadioListTile<int>(
+              // ignore: deprecated_member_use
               value: i,
+              // ignore: deprecated_member_use
               groupValue: _selected,
+              // ignore: deprecated_member_use
               onChanged: (v) => setState(() => _selected = v),
               title: Text(widget.options[i]),
             ),
@@ -721,7 +727,7 @@ class _ExamPrepSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -790,7 +796,7 @@ class _ProgressSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -860,8 +866,8 @@ class _StatChip extends StatelessWidget {
       avatar: Icon(icon, size: 16),
       label: Text(label),
       shape: const StadiumBorder(),
-      backgroundColor: Colors.white10,
-      side: const BorderSide(color: Colors.white12),
+      backgroundColor: Color(0xFF0A0A0A),
+      side: const BorderSide(color: Color(0xFF2F3336)),
       onPressed: null,
     );
   }

@@ -73,6 +73,89 @@ class _HomePageState extends State<HomePage> {
     ).push(MaterialPageRoute(builder: (_) => const ChatPage()));
   }
 
+  Future<void> _openSuggestionSettings() async {
+    final db = DBProvider.of(context);
+    String selected = _suggestLevel;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: StatefulBuilder(
+            builder: (context, setStateSB) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F3336),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Manage suggestions',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                const Text('How many suggestions?'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Suggest less'),
+                      selected: selected == 'less',
+                      onSelected: (_) async {
+                        setStateSB(() => selected = 'less');
+                        await db.setSuggestLevel('less');
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Balanced'),
+                      selected: selected == 'balanced',
+                      onSelected: (_) async {
+                        setStateSB(() => selected = 'balanced');
+                        await db.setSuggestLevel('balanced');
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Suggest more'),
+                      selected: selected == 'more',
+                      onSelected: (_) async {
+                        setStateSB(() => selected = 'more');
+                        await db.setSuggestLevel('more');
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).maybePop(),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _addSpace() async {
     final db = DBProvider.of(context);
     final created = await showModalBottomSheet<SpaceModel>(
@@ -106,7 +189,10 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Spaces'),
+        title: const Text(
+          'Spaces',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         actions: [
           IconButton(
             tooltip: 'AI chat',
@@ -119,11 +205,11 @@ class _HomePageState extends State<HomePage> {
               child: InputChip(
                 label: Text(
                   name.isEmpty ? 'me' : name,
-                  style: const TextStyle(color: Colors.white70),
+                  style: const TextStyle(color: Color(0xFF71767B)),
                 ),
                 shape: const StadiumBorder(),
-                backgroundColor: Colors.white10,
-                side: const BorderSide(color: Colors.white12),
+                backgroundColor: Color(0xFF0A0A0A),
+                side: const BorderSide(color: Color(0xFF2F3336)),
                 onPressed: _openProfile,
               ),
             ),
@@ -150,38 +236,44 @@ class _HomePageState extends State<HomePage> {
                     'Your spaces',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: Colors.white70,
+                      color: Color(0xFF71767B),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 1.2,
-                        ),
-                    itemCount: _spaces.length,
-                    itemBuilder: (context, i) {
-                      final s = _spaces[i];
-                      return _SpaceCard(
-                        space: s,
-                        onOpen: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SpacePage(
-                              spaceId: s.id,
-                              name: s.name,
-                              emoji: s.emoji,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A0A0A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2F3336)),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _spaces.length,
+                      separatorBuilder: (_, __) => const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFF2F3336),
+                        indent: 64,
+                      ),
+                      itemBuilder: (context, i) {
+                        final s = _spaces[i];
+                        return _SpaceRow(
+                          space: s,
+                          onOpen: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SpacePage(
+                                spaceId: s.id,
+                                name: s.name,
+                                emoji: s.emoji,
+                              ),
                             ),
                           ),
-                        ),
-                        onDelete: () =>
-                            DBProvider.of(context).deleteSpace(s.id),
-                      );
-                    },
+                          onDelete: () =>
+                              DBProvider.of(context).deleteSpace(s.id),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -194,9 +286,9 @@ class _HomePageState extends State<HomePage> {
     final suggestions = _buildSuggestions();
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: const Color(0xFF2F3336)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -205,7 +297,11 @@ class _HomePageState extends State<HomePage> {
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome, size: 18, color: Colors.white70),
+                const Icon(
+                  Icons.auto_awesome,
+                  size: 18,
+                  color: Color(0xFF71767B),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'Smart suggestions',
@@ -215,31 +311,28 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             if (suggestions.isEmpty)
               const Text(
                 'No suggestions yet. Add some spaces to get started.',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: Color(0xFF71767B)),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: suggestions.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.9,
+              SizedBox(
+                height: 110,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: suggestions.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, i) {
+                    final s = suggestions[i];
+                    return _SuggestionCardX(
+                      icon: s.icon,
+                      text: s.text,
+                      onTap: s.onTap,
+                    );
+                  },
                 ),
-                itemBuilder: (context, i) {
-                  final s = suggestions[i];
-                  return _SuggestionCard(
-                    icon: s.icon,
-                    text: s.text,
-                    onTap: s.onTap,
-                  );
-                },
               ),
           ],
         ),
@@ -337,80 +430,6 @@ class _HomePageState extends State<HomePage> {
         : 4; // balanced
     return items.take(limit).toList(growable: false);
   }
-
-  void _openSuggestionSettings() async {
-    final db = DBProvider.of(context);
-    final levels = const ['less', 'balanced', 'more'];
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        String selected = _suggestLevel;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                Text(
-                  'Manage suggestions',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                const Text('How many suggestions?'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final l in levels)
-                      ChoiceChip(
-                        label: Text(
-                          l == 'less'
-                              ? 'Suggest less'
-                              : l == 'more'
-                              ? 'Suggest more'
-                              : 'Balanced',
-                        ),
-                        selected: selected == l,
-                        onSelected: (_) async {
-                          selected = l;
-                          await db.setSuggestLevel(l);
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(ctx).maybePop(),
-                    child: const Text('Close'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _Suggestion {
@@ -426,8 +445,65 @@ class _Suggestion {
   });
 }
 
-class _SuggestionCard extends StatelessWidget {
-  const _SuggestionCard({
+class _SpaceRow extends StatelessWidget {
+  const _SpaceRow({
+    required this.space,
+    required this.onOpen,
+    required this.onDelete,
+  });
+  final SpaceModel space;
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onOpen,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF2F3336)),
+        ),
+        child: Center(
+          child: Text(space.emoji, style: const TextStyle(fontSize: 20)),
+        ),
+      ),
+      title: Text(
+        space.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      ),
+      subtitle: const Text(
+        '0 notes · 0 resources',
+        style: TextStyle(color: Color(0xFF71767B), fontSize: 12),
+      ),
+      trailing: PopupMenuButton<String>(
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'rename', child: Text('Rename')),
+          PopupMenuItem(value: 'delete', child: Text('Delete')),
+        ],
+        onSelected: (v) {
+          if (v == 'delete') onDelete();
+          if (v == 'rename') {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Rename (UI only)')));
+          }
+        },
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    );
+  }
+}
+
+class _SuggestionCardX extends StatelessWidget {
+  const _SuggestionCardX({
     required this.icon,
     required this.text,
     required this.onTap,
@@ -442,102 +518,59 @@ class _SuggestionCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
-        ),
+        width: 260,
         padding: const EdgeInsets.all(12),
-        child: Column(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2F3336)),
+        ),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
-                color: Colors.white12,
+                color: const Color(0xFF0A0A0A),
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFF2F3336)),
               ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(icon, size: 18, color: Colors.white70),
+              child: Icon(icon, size: 16, color: const Color(0xFF71767B)),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(width: 10),
             Expanded(
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: const [
+                      Icon(
+                        Icons.open_in_new,
+                        size: 16,
+                        color: Color(0xFF1D9BF0),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Open',
+                        style: TextStyle(
+                          color: Color(0xFF1D9BF0),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SpaceCard extends StatelessWidget {
-  const _SpaceCard({
-    required this.space,
-    required this.onOpen,
-    required this.onDelete,
-  });
-  final SpaceModel space;
-  final VoidCallback onOpen;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white12),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(space.emoji, style: const TextStyle(fontSize: 20)),
-                const Spacer(),
-                PopupMenuButton<String>(
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'rename', child: Text('Rename')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete')),
-                  ],
-                  onSelected: (v) {
-                    if (v == 'delete') onDelete();
-                    if (v == 'rename') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Rename (UI only)')),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              space.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '0 notes · 0 resources',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
         ),
@@ -557,7 +590,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.auto_awesome, size: 44, color: Colors.white60),
+          const Icon(Icons.auto_awesome, size: 44, color: Color(0xFF71767B)),
           const SizedBox(height: 12),
           Text(
             'Create your first space',
@@ -568,7 +601,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           const Text(
             'Organize topics like Programming, Physics, and more.',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: Color(0xFF71767B)),
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
@@ -592,8 +625,8 @@ class _EmptyState extends StatelessWidget {
                     onQuickCreate(s[0], s[1]);
                   },
                   shape: const StadiumBorder(),
-                  backgroundColor: Colors.white10,
-                  side: const BorderSide(color: Colors.white12),
+                  backgroundColor: Color(0xFF0A0A0A),
+                  side: const BorderSide(color: Color(0xFF2F3336)),
                 ),
             ],
           ),
@@ -638,7 +671,7 @@ class _AddSpaceSheetState extends State<_AddSpaceSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: const Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),

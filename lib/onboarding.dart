@@ -186,13 +186,7 @@ class _WelcomePage extends StatelessWidget {
                     return const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFF58529),
-                        Color(0xFFFEDA77),
-                        Color(0xFFDD2A7B),
-                        Color(0xFF8134AF),
-                        Color(0xFF515BD4),
-                      ],
+                      colors: [Color(0xFF1D9BF0), Color(0xFF8ECDF8)],
                     ).createShader(bounds);
                   },
                   blendMode: BlendMode.srcIn,
@@ -216,7 +210,7 @@ class _WelcomePage extends StatelessWidget {
             Text(
               'Generate and manage your notes with Gen-AI.',
               textAlign: TextAlign.center,
-              style: textTheme.titleMedium?.copyWith(color: Colors.white70),
+              style: textTheme.titleMedium?.copyWith(color: Color(0xFF71767B)),
             ),
           ],
         ),
@@ -257,11 +251,11 @@ class _NamePage extends StatelessWidget {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(999),
-                borderSide: const BorderSide(color: Colors.white24),
+                borderSide: const BorderSide(color: Color(0xFF2F3336)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(999),
-                borderSide: const BorderSide(color: Colors.white),
+                borderSide: const BorderSide(color: Color(0xFF1D9BF0)),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -306,7 +300,7 @@ class _ApiKeyPage extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'This app requires a Gemini API key to function.',
-            style: textTheme.titleSmall?.copyWith(color: Colors.white60),
+            style: textTheme.titleSmall?.copyWith(color: Color(0xFF71767B)),
           ),
           const SizedBox(height: 16),
           Row(
@@ -327,11 +321,11 @@ class _ApiKeyPage extends StatelessWidget {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
-                        borderSide: const BorderSide(color: Colors.white24),
+                        borderSide: const BorderSide(color: Color(0xFF2F3336)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
-                        borderSide: const BorderSide(color: Colors.white),
+                        borderSide: const BorderSide(color: Color(0xFF1D9BF0)),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -409,8 +403,8 @@ class _LightInfoChip extends StatelessWidget {
     return InputChip(
       label: Text(label, style: const TextStyle(color: Colors.white60)),
       shape: const StadiumBorder(),
-      backgroundColor: Colors.white10,
-      side: const BorderSide(color: Colors.white12),
+      backgroundColor: Color(0xFF0A0A0A),
+      side: const BorderSide(color: Color(0xFF2F3336)),
       onPressed: null,
     );
   }
@@ -429,12 +423,12 @@ class _LightLinkChip extends StatelessWidget {
         children: [
           Text(label, style: const TextStyle(color: Colors.white60)),
           const SizedBox(width: 6),
-          const Icon(Icons.open_in_new, size: 16, color: Colors.white60),
+          const Icon(Icons.open_in_new, size: 16, color: Color(0xFF71767B)),
         ],
       ),
       shape: const StadiumBorder(),
-      backgroundColor: Colors.white10,
-      side: const BorderSide(color: Colors.white12),
+      backgroundColor: Color(0xFF0A0A0A),
+      side: const BorderSide(color: Color(0xFF2F3336)),
       onPressed: onPressed,
     );
   }
@@ -450,10 +444,10 @@ class _LightActionChip extends StatelessWidget {
     return FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
-        backgroundColor: Colors.white10,
-        foregroundColor: Colors.white60,
+        backgroundColor: const Color(0xFF0A0A0A),
+        foregroundColor: const Color(0xFF71767B),
         shape: const StadiumBorder(),
-        side: const BorderSide(color: Colors.white12),
+        side: const BorderSide(color: Color(0xFF2F3336)),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         textStyle: const TextStyle(fontWeight: FontWeight.w500),
         elevation: 0,

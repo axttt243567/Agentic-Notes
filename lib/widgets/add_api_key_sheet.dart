@@ -38,7 +38,7 @@ class _AddApiKeySheetState extends State<AddApiKeySheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: Color(0xFF2F3336),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),

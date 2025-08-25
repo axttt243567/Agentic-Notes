@@ -47,15 +47,15 @@ class _ChatPageState extends State<ChatPage> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: m.isUser ? Colors.blue : Colors.white10,
+                                color: m.isUser
+                                    ? const Color(0xFF1D9BF0)
+                                    : const Color(0xFF0A0A0A),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white12),
+                                border: Border.all(color: Color(0xFF2F3336)),
                               ),
                               child: Text(
                                 m.text,
-                                style: TextStyle(
-                                  color: m.isUser ? Colors.white : Colors.white,
-                                ),
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
                           ),
@@ -63,7 +63,7 @@ class _ChatPageState extends State<ChatPage> {
                       },
                     ),
             ),
-            const Divider(height: 1),
+            const Divider(height: 1, color: Color(0xFF2F3336)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
               child: Row(
@@ -130,7 +130,7 @@ class _ChatEmpty extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(Icons.star_border, size: 44, color: Colors.white60),
+          Icon(Icons.star_border, size: 44, color: Color(0xFF71767B)),
           SizedBox(height: 12),
           Text(
             'Start a conversation',
@@ -139,7 +139,7 @@ class _ChatEmpty extends StatelessWidget {
           SizedBox(height: 6),
           Text(
             'Front-end only demo chat',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: Color(0xFF71767B)),
           ),
         ],
       ),

@@ -107,13 +107,15 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white10,
+                                  color: const Color(0xFF0A0A0A),
                                   borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: Colors.white12),
+                                  border: Border.all(color: Color(0xFF2F3336)),
                                 ),
                                 child: Text(
                                   '${_keys.length} key${_keys.length == 1 ? '' : 's'}',
-                                  style: const TextStyle(color: Colors.white70),
+                                  style: const TextStyle(
+                                    color: Color(0xFF71767B),
+                                  ),
                                 ),
                               ),
                               const Spacer(),
@@ -121,8 +123,10 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 label: const Text('+ add'),
                                 onPressed: _addApiKey,
                                 shape: const StadiumBorder(),
-                                backgroundColor: Colors.white10,
-                                side: const BorderSide(color: Colors.white12),
+                                backgroundColor: Color(0xFF0A0A0A),
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
                               ),
                             ],
                           ),
@@ -134,22 +138,24 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 children: [
                                   const Icon(
                                     Icons.vpn_key_outlined,
-                                    color: Colors.white60,
+                                    color: Color(0xFF71767B),
                                   ),
                                   const SizedBox(width: 8),
                                   const Expanded(
                                     child: Text(
                                       'No API keys yet',
-                                      style: TextStyle(color: Colors.white70),
+                                      style: TextStyle(
+                                        color: Color(0xFF71767B),
+                                      ),
                                     ),
                                   ),
                                   InputChip(
                                     label: const Text('+ add'),
                                     onPressed: _addApiKey,
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Colors.white10,
+                                    backgroundColor: Color(0xFF0A0A0A),
                                     side: const BorderSide(
-                                      color: Colors.white12,
+                                      color: Color(0xFF2F3336),
                                     ),
                                   ),
                                 ],
@@ -158,9 +164,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           else
                             Container(
                               decoration: BoxDecoration(
-                                color: Colors.white10,
+                                color: const Color(0xFF0A0A0A),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white12),
+                                border: Border.all(color: Color(0xFF2F3336)),
                               ),
                               child: Column(
                                 children: [
@@ -173,7 +179,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                       const Divider(
                                         height: 1,
                                         thickness: 1,
-                                        color: Colors.white12,
+                                        color: Color(0xFF2F3336),
                                         indent: 48,
                                       ),
                                   ],
@@ -195,13 +201,15 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white10,
+                                  color: const Color(0xFF0A0A0A),
                                   borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: Colors.white12),
+                                  border: Border.all(color: Color(0xFF2F3336)),
                                 ),
                                 child: Text(
                                   '${_spaces.length} space${_spaces.length == 1 ? '' : 's'}',
-                                  style: const TextStyle(color: Colors.white70),
+                                  style: const TextStyle(
+                                    color: Color(0xFF71767B),
+                                  ),
                                 ),
                               ),
                               const Spacer(),
@@ -209,8 +217,10 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 label: const Text('+ new'),
                                 onPressed: _createSpace,
                                 shape: const StadiumBorder(),
-                                backgroundColor: Colors.white10,
-                                side: const BorderSide(color: Colors.white12),
+                                backgroundColor: Color(0xFF0A0A0A),
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
                               ),
                             ],
                           ),
@@ -233,9 +243,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                     onPressed: () =>
                                         _quickCreateSpace(s[0], s[1]),
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Colors.white10,
+                                    backgroundColor: Color(0xFF0A0A0A),
                                     side: const BorderSide(
-                                      color: Colors.white12,
+                                      color: Color(0xFF2F3336),
                                     ),
                                   ),
                               ],
@@ -260,9 +270,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                       );
                                     },
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Colors.white10,
+                                    backgroundColor: Color(0xFF0A0A0A),
                                     side: const BorderSide(
-                                      color: Colors.white12,
+                                      color: Color(0xFF2F3336),
                                     ),
                                   ),
                               ],
@@ -318,7 +328,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
       height: 4,
       margin: const EdgeInsets.fromLTRB(0, 8, 0, 12),
       decoration: BoxDecoration(
-        color: Colors.white24,
+        color: Color(0xFF2F3336),
         borderRadius: BorderRadius.circular(999),
       ),
     ),
@@ -337,7 +347,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
           title,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: Colors.white70,
+            color: Color(0xFF71767B),
           ),
         ),
         const SizedBox(height: 10),
@@ -377,17 +387,17 @@ class _ProfileSheetState extends State<ProfileSheet> {
     return ListTile(
       leading: Icon(
         isActive ? Icons.check_circle : Icons.vpn_key_outlined,
-        color: isActive ? Colors.lightGreenAccent : Colors.white70,
+        color: isActive ? Colors.lightGreenAccent : const Color(0xFF71767B),
       ),
       title: Text(keyData.name),
-      subtitle: Text(masked, style: const TextStyle(color: Colors.white70)),
+      subtitle: Text(masked, style: const TextStyle(color: Color(0xFF71767B))),
       trailing: InputChip(
         label: const Text('manage'),
         avatar: const Icon(Icons.settings_outlined, size: 18),
         onPressed: onManage,
         shape: const StadiumBorder(),
-        backgroundColor: Colors.white10,
-        side: const BorderSide(color: Colors.white12),
+        backgroundColor: Color(0xFF0A0A0A),
+        side: const BorderSide(color: Color(0xFF2F3336)),
       ),
     );
   }
@@ -486,9 +496,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
   Widget _aboutCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: Color(0xFF2F3336)),
       ),
       child: const ListTile(
         leading: Icon(Icons.info_outline),
