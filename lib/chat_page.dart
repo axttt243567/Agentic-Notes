@@ -29,31 +29,7 @@ class _ChatPageState extends State<ChatPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: UniversalChatToolbar(
-                textFieldFocus: _inputFocus,
-                onAction: (a) {
-                  // Placeholder interactions for front-end only
-                  switch (a) {
-                    case ChatAction.text:
-                      // focus handled in toolbar
-                      break;
-                    case ChatAction.camera:
-                    case ChatAction.gallery:
-                    case ChatAction.files:
-                    case ChatAction.audio:
-                    case ChatAction.call:
-                    case ChatAction.video:
-                    case ChatAction.spaces:
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Action: ${a.name}')),
-                      );
-                      break;
-                  }
-                },
-              ),
-            ),
+            // top toolbar removed per user request
             Expanded(
               child: _messages.isEmpty
                   ? const _ChatEmpty()
@@ -92,32 +68,19 @@ class _ChatPageState extends State<ChatPage> {
                     ),
             ),
             const Divider(height: 1, color: Color(0xFF2F3336)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      focusNode: _inputFocus,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _sending ? null : _send,
-                    icon: const Icon(Icons.send),
-                    label: const Text('Send'),
-                  ),
-                ],
-              ),
+            UniversalChatToolbar(
+              textFieldFocus: _inputFocus,
+              controller: _ctrl,
+              sending: _sending,
+              onAction: (a) {
+                if (a == ChatAction.text) return; // focus managed
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Action: ${a.name}')));
+              },
+              onSend: (t) {
+                _send();
+              },
             ),
           ],
         ),

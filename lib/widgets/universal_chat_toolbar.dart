@@ -8,10 +8,16 @@ class UniversalChatToolbar extends StatefulWidget {
   const UniversalChatToolbar({
     super.key,
     required this.onAction,
+    required this.onSend,
+    this.controller,
+    this.sending = false,
     this.textFieldFocus,
   });
 
   final void Function(ChatAction action) onAction;
+  final void Function(String text) onSend;
+  final TextEditingController? controller;
+  final bool sending;
   final FocusNode? textFieldFocus;
 
   @override
@@ -51,7 +57,74 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: [_buildRow(row1), const SizedBox(height: 8), _buildRow(row2)],
+      children: [
+        _buildRow(row1),
+        const SizedBox(height: 8),
+        _buildRow(row2),
+        const SizedBox(height: 8),
+        _inputRow(context),
+      ],
+    );
+  }
+
+  Widget _inputRow(BuildContext context) {
+    final ctrl = widget.controller ?? TextEditingController();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFF2F3336)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: const Color(0xFF71767B),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: ctrl,
+                      focusNode: widget.textFieldFocus,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (t) => widget.onSend(t),
+                      style: const TextStyle(color: Color(0xFFE7E9EA)),
+                      decoration: const InputDecoration.collapsed(
+                        hintText: 'Message, images, files...',
+                        hintStyle: TextStyle(color: Color(0xFF71767B)),
+                      ),
+                    ),
+                  ),
+                  if (ctrl.text.isNotEmpty) const SizedBox(width: 6),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: widget.sending
+                  ? Colors.grey.shade800
+                  : const Color(0xFF1D9BF0),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: IconButton(
+              onPressed: widget.sending ? null : () => widget.onSend(ctrl.text),
+              icon: const Icon(Icons.send, color: Colors.white),
+              splashRadius: 22,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -87,39 +160,82 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
       widget.onAction(a);
     }
 
+    // Modern, X-inspired chip visuals
+    final baseDecoration = BoxDecoration(
+      color: const Color(0xFF0A0A0A),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: const Color(0xFF2F3336)),
+    );
+
     switch (mode) {
       case ChipMode.icon:
         return InkWell(
-          borderRadius: BorderRadius.circular(999),
           onTap: trigger,
+          borderRadius: BorderRadius.circular(999),
           child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A0A0A),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFF2F3336)),
+            width: 40,
+            height: 40,
+            decoration: baseDecoration,
+            child: Center(
+              child: Icon(icon, size: 18, color: const Color(0xFF71767B)),
             ),
-            child: Icon(icon, size: 18, color: const Color(0xFF71767B)),
           ),
         );
       case ChipMode.short:
-        return InputChip(
-          label: Text(labelShort),
-          avatar: Icon(icon, size: 16, color: const Color(0xFF71767B)),
-          onPressed: trigger,
-          backgroundColor: const Color(0xFF0A0A0A),
-          shape: const StadiumBorder(),
-          side: const BorderSide(color: Color(0xFF2F3336)),
+        return InkWell(
+          onTap: trigger,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: baseDecoration,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: const Color(0xFF71767B)),
+                const SizedBox(width: 8),
+                Text(
+                  labelShort,
+                  style: const TextStyle(color: Color(0xFFE7E9EA)),
+                ),
+              ],
+            ),
+          ),
         );
       case ChipMode.long:
-        return InputChip(
-          label: Text(labelLong),
-          avatar: Icon(icon, size: 16, color: const Color(0xFF71767B)),
-          onPressed: trigger,
-          backgroundColor: const Color(0xFF0A0A0A),
-          shape: const StadiumBorder(),
-          side: const BorderSide(color: Color(0xFF2F3336)),
+        return InkWell(
+          onTap: trigger,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: baseDecoration.copyWith(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: const Color(0xFF71767B)),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      labelShort,
+                      style: const TextStyle(
+                        color: Color(0xFFE7E9EA),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      labelLong,
+                      style: const TextStyle(
+                        color: Color(0xFF71767B),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
     }
   }
