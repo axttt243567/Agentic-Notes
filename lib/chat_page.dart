@@ -130,7 +130,7 @@ class _ChatEmpty extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(Icons.star_border, size: 44, color: Color(0xFF71767B)),
+          Icon(Icons.auto_awesome, size: 44, color: Color(0xFF71767B)),
           SizedBox(height: 12),
           Text(
             'Start a conversation',

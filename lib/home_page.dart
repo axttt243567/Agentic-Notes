@@ -197,7 +197,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             tooltip: 'AI chat',
             onPressed: _openChat,
-            icon: const Icon(Icons.star_border),
+            icon: const Icon(Icons.auto_awesome),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -382,7 +382,7 @@ class _HomePageState extends State<HomePage> {
     void addAiChat(SpaceModel sp) {
       items.add(
         _Suggestion(
-          icon: Icons.star_border,
+          icon: Icons.auto_awesome,
           text: 'Chat with AI about ${sp.name}',
           actionLabel: 'Open',
           onTap: () {

@@ -70,7 +70,7 @@ class _SpacePageState extends State<SpacePage>
         actions: [
           IconButton(
             tooltip: 'Chat with AI',
-            icon: const Icon(Icons.star_border),
+            icon: const Icon(Icons.auto_awesome),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ChatPage(title: 'AI · ${widget.name}'),
@@ -143,7 +143,7 @@ class _StudyTab extends StatelessWidget {
               onTap: () => _prepareTopic(context),
             ),
             _ActionCard(
-              icon: Icons.star_border,
+              icon: Icons.auto_awesome,
               title: 'Learn from AI',
               subtitle: 'Chat with an AI about $spaceName',
               onTap: () => Navigator.of(context).push(
