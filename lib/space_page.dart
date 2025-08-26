@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'chat_page.dart';
 
 class SpacePage extends StatefulWidget {
@@ -25,6 +26,10 @@ class _SpacePageState extends State<SpacePage>
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
@@ -44,6 +49,7 @@ class _SpacePageState extends State<SpacePage>
       builder: (_) => const _AddResourceSheet(),
     );
     if (added == null) return;
+    if (!mounted) return;
     setState(() => _resources.add(added));
   }
 
@@ -273,12 +279,21 @@ class _ResourcesTab extends StatelessWidget {
           child: ListTile(
             leading: Icon(_iconFor(r.type), color: Color(0xFF71767B)),
             title: Text(r.title),
-            subtitle: r.url == null
-                ? null
-                : Text(
-                    r.url!,
-                    style: const TextStyle(color: Color(0xFF71767B)),
-                  ),
+            subtitle: () {
+              if (r.localPath != null && r.localPath!.isNotEmpty) {
+                return Text(
+                  'Local file · ${r.localPath!.split('\\').last}',
+                  style: const TextStyle(color: Color(0xFF71767B)),
+                );
+              }
+              if (r.url != null && r.url!.isNotEmpty) {
+                return Text(
+                  r.url!,
+                  style: const TextStyle(color: Color(0xFF71767B)),
+                );
+              }
+              return null;
+            }(),
             trailing: PopupMenuButton<String>(
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'open', child: Text('Open')),
@@ -288,7 +303,13 @@ class _ResourcesTab extends StatelessWidget {
                 if (v == 'delete') onDelete(r.id);
                 if (v == 'open') {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Open (UI only)')),
+                    SnackBar(
+                      content: Text(
+                        r.localPath != null
+                            ? 'Open local (UI only)'
+                            : 'Open (UI only)',
+                      ),
+                    ),
                   );
                 }
               },
@@ -351,6 +372,7 @@ class _AddResourceSheetState extends State<_AddResourceSheet> {
   final _titleCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _textCtrl = TextEditingController();
+  String? _pickedPdfPath;
 
   @override
   void dispose() {
@@ -412,6 +434,32 @@ class _AddResourceSheetState extends State<_AddResourceSheet> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
+            if (_type == _ResourceType.pdf) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _pickedPdfPath == null
+                          ? 'No PDF selected'
+                          : _pickedPdfPath!.split('\\').last,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFF71767B)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickPdf,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Pick PDF'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Center(
+                child: Text('or', style: TextStyle(color: Color(0xFF71767B))),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (_type == _ResourceType.pdf ||
                 _type == _ResourceType.youtube ||
                 _type == _ResourceType.link)
@@ -479,12 +527,35 @@ class _AddResourceSheetState extends State<_AddResourceSheet> {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     switch (_type) {
       case _ResourceType.pdf:
+        final url = _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim();
+        if ((url == null || url.isEmpty) && (_pickedPdfPath == null)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pick a PDF or enter a PDF URL')),
+          );
+          return;
+        }
+        Navigator.of(context).pop(
+          _ResourceItem(
+            id: id,
+            title: title,
+            type: _type,
+            url: url,
+            localPath: _pickedPdfPath,
+          ),
+        );
+        return;
       case _ResourceType.youtube:
       case _ResourceType.link:
-        final url = _urlCtrl.text.trim();
+        final url2 = _urlCtrl.text.trim();
+        if (url2.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter a valid URL')),
+          );
+          return;
+        }
         Navigator.of(
           context,
-        ).pop(_ResourceItem(id: id, title: title, type: _type, url: url));
+        ).pop(_ResourceItem(id: id, title: title, type: _type, url: url2));
         return;
       case _ResourceType.text:
         final text = _textCtrl.text.trim();
@@ -492,6 +563,24 @@ class _AddResourceSheetState extends State<_AddResourceSheet> {
           context,
         ).pop(_ResourceItem(id: id, title: title, type: _type, note: text));
         return;
+    }
+  }
+
+  Future<void> _pickPdf() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      if (!mounted) return;
+      if (res != null && res.files.isNotEmpty) {
+        setState(() => _pickedPdfPath = res.files.single.path);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick file: $e')));
     }
   }
 }
@@ -504,12 +593,14 @@ class _ResourceItem {
   final _ResourceType type;
   final String? url;
   final String? note;
+  final String? localPath; // for local PDFs
   _ResourceItem({
     required this.id,
     required this.title,
     required this.type,
     this.url,
     this.note,
+    this.localPath,
   });
 }
 

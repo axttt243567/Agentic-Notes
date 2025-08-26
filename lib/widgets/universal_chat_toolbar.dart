@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 
-enum ChatAction { text, camera, gallery, files, audio, call, video, spaces }
+enum ChatAction {
+  text,
+  camera,
+  gallery,
+  files,
+  audio,
+  call,
+  video,
+  spaces,
+  createImage,
+}
 
 enum ChipMode { icon, short, long }
 
@@ -12,6 +22,9 @@ class UniversalChatToolbar extends StatefulWidget {
     this.controller,
     this.sending = false,
     this.textFieldFocus,
+    this.currentModel,
+    this.onPickModel,
+    this.createImageActive = false,
   });
 
   final void Function(ChatAction action) onAction;
@@ -19,6 +32,9 @@ class UniversalChatToolbar extends StatefulWidget {
   final TextEditingController? controller;
   final bool sending;
   final FocusNode? textFieldFocus;
+  final String? currentModel;
+  final VoidCallback? onPickModel;
+  final bool createImageActive;
 
   @override
   State<UniversalChatToolbar> createState() => _UniversalChatToolbarState();
@@ -70,10 +86,11 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
-                borderRadius: BorderRadius.circular(999),
+                color: const Color(0xFF111113), // iOS-like dark input field
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF2F3336)),
               ),
               child: Row(
                 children: [
@@ -84,7 +101,9 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (t) => widget.onSend(t),
                       style: const TextStyle(color: Color(0xFFE7E9EA)),
-                      decoration: const InputDecoration.collapsed(hintText: ''),
+                      decoration: const InputDecoration.collapsed(
+                        hintText: 'Message',
+                      ),
                     ),
                   ),
                 ],
@@ -93,18 +112,18 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
           ),
           const SizedBox(width: 8),
           Container(
-            width: 42,
-            height: 42,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: widget.sending
                   ? Colors.grey.shade800
                   : const Color(0xFF1D9BF0),
-              borderRadius: BorderRadius.circular(999),
+              shape: BoxShape.circle,
             ),
             child: IconButton(
               onPressed: widget.sending ? null : () => widget.onSend(ctrl.text),
-              icon: const Icon(Icons.send, color: Colors.white),
-              splashRadius: 22,
+              icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white),
+              splashRadius: 19,
             ),
           ),
         ],
@@ -118,16 +137,79 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: actions.length,
+        itemCount: actions.length + 2,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final a = actions[i];
+          if (i == 0) {
+            return _modelChip();
+          }
+          if (i == 1) {
+            return _createImageChip();
+          }
+          final a = actions[i - 2];
           final mode = _modes[a]!;
           return GestureDetector(
             onLongPress: () => _cycleMode(a),
             child: _buildChip(context, a, mode),
           );
         },
+      ),
+    );
+  }
+
+  Widget _modelChip() {
+    final model = widget.currentModel ?? 'gemini-2.5-flash-lite';
+    return InkWell(
+      onTap: widget.onPickModel,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFF2F3336)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.memory_outlined,
+              size: 16,
+              color: Color(0xFF71767B),
+            ),
+            const SizedBox(width: 8),
+            Text(model, style: const TextStyle(color: Color(0xFFE7E9EA))),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more, size: 16, color: Color(0xFF71767B)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _createImageChip() {
+    final active = widget.createImageActive;
+    final bg = active ? const Color(0xFF1D9BF0) : const Color(0xFF0A0A0A);
+    final fg = active ? Colors.white : const Color(0xFFE7E9EA);
+    final ic = active ? Colors.white : const Color(0xFF71767B);
+    return InkWell(
+      onTap: () => widget.onAction(ChatAction.createImage),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFF2F3336)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome, size: 16, color: ic),
+            const SizedBox(width: 8),
+            Text('Create imge', style: TextStyle(color: fg)),
+          ],
+        ),
       ),
     );
   }
@@ -242,6 +324,8 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
         return Icons.videocam_outlined;
       case ChatAction.spaces:
         return Icons.folder_open;
+      case ChatAction.createImage:
+        return Icons.auto_awesome;
     }
   }
 
@@ -263,6 +347,8 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
         return 'Video';
       case ChatAction.spaces:
         return 'Spaces';
+      case ChatAction.createImage:
+        return 'Create imge';
     }
   }
 
@@ -284,6 +370,8 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
         return 'Start video';
       case ChatAction.spaces:
         return 'Add space context';
+      case ChatAction.createImage:
+        return 'Generate from text';
     }
   }
 }

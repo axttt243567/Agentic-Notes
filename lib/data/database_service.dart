@@ -11,6 +11,7 @@ class DatabaseService {
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
+  static const _preferredModelField = 'preferred_model';
 
   late final Box _profile;
   late final Box _apiKeys;
@@ -21,18 +22,21 @@ class DatabaseService {
   final _activeKeyCtrl = StreamController<String?>.broadcast();
   final _spacesCtrl = StreamController<List<SpaceModel>>.broadcast();
   final _suggestLevelCtrl = StreamController<String>.broadcast();
+  final _preferredModelCtrl = StreamController<String>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
   Stream<String?> get activeApiKeyStream => _activeKeyCtrl.stream;
   Stream<List<SpaceModel>> get spacesStream => _spacesCtrl.stream;
   Stream<String> get suggestLevelStream => _suggestLevelCtrl.stream;
+  Stream<String> get preferredModelStream => _preferredModelCtrl.stream;
 
   UserProfileModel get currentProfile => _readProfile();
   List<ApiKeyModel> get currentApiKeys => _readApiKeys();
   String? get currentActiveApiKeyId => _readActiveApiKeyId();
   List<SpaceModel> get currentSpaces => _readSpaces();
   String get currentSuggestLevel => _readSuggestLevel();
+  String get currentPreferredModel => _readPreferredModel();
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -51,6 +55,9 @@ class DatabaseService {
     if (!svc._profile.containsKey(_suggestLevelField)) {
       await svc._profile.put(_suggestLevelField, 'balanced');
     }
+    if (!svc._profile.containsKey(_preferredModelField)) {
+      await svc._profile.put(_preferredModelField, 'gemini-2.5-flash-lite');
+    }
     svc._emitAll();
 
     // Watch for changes and emit
@@ -63,6 +70,9 @@ class DatabaseService {
     svc._profile
         .watch(key: _suggestLevelField)
         .listen((_) => svc._emitSuggestLevel());
+    svc._profile
+        .watch(key: _preferredModelField)
+        .listen((_) => svc._emitPreferredModel());
     return svc;
   }
 
@@ -72,6 +82,7 @@ class DatabaseService {
     _activeKeyCtrl.close();
     _spacesCtrl.close();
     _suggestLevelCtrl.close();
+    _preferredModelCtrl.close();
   }
 
   // Profile operations
@@ -111,6 +122,12 @@ class DatabaseService {
   Future<void> setSuggestLevel(String level) async {
     await _profile.put(_suggestLevelField, level);
     _emitSuggestLevel();
+  }
+
+  // Preferred model operations
+  Future<void> setPreferredModel(String model) async {
+    await _profile.put(_preferredModelField, model);
+    _emitPreferredModel();
   }
 
   // Spaces operations
@@ -160,6 +177,11 @@ class DatabaseService {
     return v ?? 'balanced';
   }
 
+  String _readPreferredModel() {
+    final v = _profile.get(_preferredModelField) as String?;
+    return v ?? 'gemini-2.5-flash-lite';
+  }
+
   void _emitAll() {
     _emitProfile();
     _emitApiKeys();
@@ -173,4 +195,5 @@ class DatabaseService {
   void _emitActiveKey() => _activeKeyCtrl.add(_readActiveApiKeyId());
   void _emitSpaces() => _spacesCtrl.add(_readSpaces());
   void _emitSuggestLevel() => _suggestLevelCtrl.add(_readSuggestLevel());
+  void _emitPreferredModel() => _preferredModelCtrl.add(_readPreferredModel());
 }
