@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding.dart';
 import 'data/database_service.dart';
+import 'data/chat_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = await DatabaseService.init();
-  runApp(DBProvider(database: db, child: const MyApp()));
+  final chat = ChatService(db);
+  runApp(
+    DBProvider(
+      database: db,
+      child: ChatProvider(chat: chat, child: const MyApp()),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -93,4 +100,16 @@ class DBProvider extends InheritedWidget {
   @override
   bool updateShouldNotify(covariant DBProvider oldWidget) =>
       oldWidget.database != database;
+}
+
+class ChatProvider extends InheritedWidget {
+  final ChatService chat;
+  const ChatProvider({super.key, required this.chat, required super.child});
+
+  static ChatService of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ChatProvider>()!.chat;
+
+  @override
+  bool updateShouldNotify(covariant ChatProvider oldWidget) =>
+      oldWidget.chat != chat;
 }

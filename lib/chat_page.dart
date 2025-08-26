@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'widgets/universal_chat_toolbar.dart';
+import 'main.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, this.title});
@@ -25,7 +26,31 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title ?? 'AI Chat')),
+      appBar: AppBar(
+        title: Text(widget.title ?? 'AI Chat'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Voice call',
+            icon: const Icon(Icons.call_outlined),
+            onPressed: () {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Call (UI only)')));
+            },
+          ),
+          IconButton(
+            tooltip: 'Video call',
+            icon: const Icon(Icons.videocam_outlined),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Video call (UI only)')),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -49,13 +74,15 @@ class _ChatPageState extends State<ChatPage> {
                               maxWidth: MediaQuery.of(context).size.width * .75,
                             ),
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: m.isUser
                                     ? const Color(0xFF1D9BF0)
-                                    : const Color(0xFF0A0A0A),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Color(0xFF2F3336)),
+                                    : const Color(0xFF0E0E0E),
+                                borderRadius: BorderRadius.circular(18),
                               ),
                               child: Text(
                                 m.text,
@@ -67,7 +94,7 @@ class _ChatPageState extends State<ChatPage> {
                       },
                     ),
             ),
-            const Divider(height: 1, color: Color(0xFF2F3336)),
+            // divider removed for a cleaner minimal look
             UniversalChatToolbar(
               textFieldFocus: _inputFocus,
               controller: _ctrl,
@@ -90,20 +117,35 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _sending) return;
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true));
       _sending = true;
       _ctrl.clear();
     });
 
-    // Simulate AI response (front-end only)
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() {
-      _messages.add(_ChatMessage(text: 'Echo: $text', isUser: false));
-      _sending = false;
-    });
+    try {
+      final chat = ChatProvider.of(context);
+      final reply = await chat.sendText(text);
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_ChatMessage(text: reply, isUser: false));
+      });
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Chat failed: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
   }
 }
 
@@ -130,7 +172,7 @@ class _ChatEmpty extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            'Front-end only demo chat',
+            'Uses Gemini 2.5 Flash-Lite. Add an API key in Profile.',
             style: TextStyle(color: Color(0xFF71767B)),
           ),
         ],

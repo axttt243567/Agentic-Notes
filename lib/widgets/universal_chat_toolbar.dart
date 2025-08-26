@@ -26,69 +26,57 @@ class UniversalChatToolbar extends StatefulWidget {
 
 class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
   final Map<ChatAction, ChipMode> _modes = {
-    for (final a in ChatAction.values) a: ChipMode.short,
+    for (final a in ChatAction.values) a: ChipMode.icon,
   };
 
   void _cycleMode(ChatAction a) {
     setState(() {
       final now = _modes[a]!;
-      _modes[a] = now == ChipMode.icon
-          ? ChipMode.short
-          : now == ChipMode.short
-          ? ChipMode.long
-          : ChipMode.icon;
+      switch (now) {
+        case ChipMode.icon:
+          _modes[a] = ChipMode.short;
+          break;
+        case ChipMode.short:
+          _modes[a] = ChipMode.long;
+          break;
+        case ChipMode.long:
+          _modes[a] = ChipMode.icon;
+          break;
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final row1 = const [
-      ChatAction.text,
+    final all = const [
       ChatAction.camera,
       ChatAction.gallery,
       ChatAction.files,
-    ];
-    final row2 = const [
       ChatAction.audio,
-      ChatAction.call,
-      ChatAction.video,
       ChatAction.spaces,
     ];
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildRow(row1),
-        const SizedBox(height: 8),
-        _buildRow(row2),
-        const SizedBox(height: 8),
-        _inputRow(context),
-      ],
+      children: [_buildRow(all), const SizedBox(height: 8), _inputRow(context)],
     );
   }
 
   Widget _inputRow(BuildContext context) {
     final ctrl = widget.controller ?? TextEditingController();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF0A0A0A),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFF2F3336)),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.edit_outlined,
-                    size: 18,
-                    color: const Color(0xFF71767B),
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: ctrl,
@@ -96,21 +84,17 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (t) => widget.onSend(t),
                       style: const TextStyle(color: Color(0xFFE7E9EA)),
-                      decoration: const InputDecoration.collapsed(
-                        hintText: 'Message, images, files...',
-                        hintStyle: TextStyle(color: Color(0xFF71767B)),
-                      ),
+                      decoration: const InputDecoration.collapsed(hintText: ''),
                     ),
                   ),
-                  if (ctrl.text.isNotEmpty) const SizedBox(width: 6),
                 ],
               ),
             ),
           ),
           const SizedBox(width: 8),
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: widget.sending
                   ? Colors.grey.shade800
@@ -130,7 +114,7 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
 
   Widget _buildRow(List<ChatAction> actions) {
     return SizedBox(
-      height: 40,
+      height: 36,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -173,8 +157,8 @@ class _UniversalChatToolbarState extends State<UniversalChatToolbar> {
           onTap: trigger,
           borderRadius: BorderRadius.circular(999),
           child: Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: baseDecoration,
             child: Center(
               child: Icon(icon, size: 18, color: const Color(0xFF71767B)),
