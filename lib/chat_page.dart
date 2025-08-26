@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/universal_chat_toolbar.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, this.title});
@@ -11,10 +12,12 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final List<_ChatMessage> _messages = [];
   final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _inputFocus = FocusNode();
   bool _sending = false;
 
   @override
   void dispose() {
+    _inputFocus.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -26,6 +29,31 @@ class _ChatPageState extends State<ChatPage> {
       body: SafeArea(
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: UniversalChatToolbar(
+                textFieldFocus: _inputFocus,
+                onAction: (a) {
+                  // Placeholder interactions for front-end only
+                  switch (a) {
+                    case ChatAction.text:
+                      // focus handled in toolbar
+                      break;
+                    case ChatAction.camera:
+                    case ChatAction.gallery:
+                    case ChatAction.files:
+                    case ChatAction.audio:
+                    case ChatAction.call:
+                    case ChatAction.video:
+                    case ChatAction.spaces:
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Action: ${a.name}')),
+                      );
+                      break;
+                  }
+                },
+              ),
+            ),
             Expanded(
               child: _messages.isEmpty
                   ? const _ChatEmpty()
@@ -71,6 +99,7 @@ class _ChatPageState extends State<ChatPage> {
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
+                      focusNode: _inputFocus,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
                       decoration: const InputDecoration(
