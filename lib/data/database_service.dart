@@ -8,6 +8,7 @@ class DatabaseService {
   static const _boxProfile = 'profile_box';
   static const _boxApiKeys = 'api_keys_box';
   static const _boxSpaces = 'spaces_box';
+  static const _boxStudents = 'students_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -16,6 +17,7 @@ class DatabaseService {
   late final Box _profile;
   late final Box _apiKeys;
   late final Box _spaces;
+  late final Box _students;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -44,6 +46,7 @@ class DatabaseService {
     svc._profile = await Hive.openBox(_boxProfile);
     svc._apiKeys = await Hive.openBox(_boxApiKeys);
     svc._spaces = await Hive.openBox(_boxSpaces);
+    svc._students = await Hive.openBox(_boxStudents);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -64,6 +67,7 @@ class DatabaseService {
     svc._profile.watch().listen((_) => svc._emitProfile());
     svc._apiKeys.watch().listen((_) => svc._emitApiKeys());
     svc._spaces.watch().listen((_) => svc._emitSpaces());
+    svc._students.watch().listen((_) => svc._emitStudents());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -88,6 +92,24 @@ class DatabaseService {
   // Profile operations
   Future<void> setDisplayName(String name) async {
     final profile = _readProfile().copyWith(displayName: name);
+    await _profile.put('user', profile.toJson());
+    _emitProfile();
+  }
+
+  Future<void> setProfileDetails({
+    String? section,
+    String? group,
+    int? semester,
+    String? rollNo,
+    String? branch,
+  }) async {
+    final profile = _readProfile().copyWith(
+      section: section,
+      group: group,
+      semester: semester,
+      rollNo: rollNo,
+      branch: branch,
+    );
     await _profile.put('user', profile.toJson());
     _emitProfile();
   }
@@ -139,6 +161,75 @@ class DatabaseService {
   Future<void> deleteSpace(String id) async {
     await _spaces.delete(id);
     _emitSpaces();
+  }
+
+  // Students operations
+  Future<void> upsertStudentsBulk(List<StudentModel> students) async {
+    if (students.isEmpty) return;
+    final Map<String, Map<String, dynamic>> entries = {
+      for (final s in students) s.rollNo: s.toJson(),
+    };
+    await _students.putAll(entries);
+    _emitStudents();
+  }
+
+  Future<void> upsertStudent(StudentModel student) async {
+    await _students.put(student.rollNo, student.toJson());
+    _emitStudents();
+  }
+
+  List<StudentModel> queryStudentsByNamePrefix(
+    String prefix, {
+    int limit = 10,
+  }) {
+    final lq = prefix.toLowerCase();
+    if (lq.isEmpty) return const [];
+    final results = <StudentModel>[];
+    for (final key in _students.keys) {
+      final json = (_students.get(key) as Map).cast<String, dynamic>();
+      final s = StudentModel.fromJson(json);
+      if (s.name.toLowerCase().startsWith(lq)) {
+        results.add(s);
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+
+  List<StudentModel> queryStudentsByRollPrefix(
+    String prefix, {
+    int limit = 10,
+  }) {
+    final lq = prefix.toLowerCase();
+    if (lq.isEmpty) return const [];
+    final results = <StudentModel>[];
+    for (final key in _students.keys) {
+      final json = (_students.get(key) as Map).cast<String, dynamic>();
+      final s = StudentModel.fromJson(json);
+      if (s.rollNo.toLowerCase().startsWith(lq)) {
+        results.add(s);
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+
+  StudentModel? findStudentByExact(String query) {
+    final q = query.trim();
+    if (q.isEmpty) return null;
+    final lq = q.toLowerCase();
+    // Try key by roll first for O(1)
+    final byRoll = _students.get(q);
+    if (byRoll != null) {
+      return StudentModel.fromJson((byRoll as Map).cast<String, dynamic>());
+    }
+    for (final key in _students.keys) {
+      final json = (_students.get(key) as Map).cast<String, dynamic>();
+      final s = StudentModel.fromJson(json);
+      if (s.name.toLowerCase() == lq) return s;
+      if (s.rollNo.toLowerCase() == lq) return s;
+    }
+    return null;
   }
 
   // Reads
@@ -196,4 +287,7 @@ class DatabaseService {
   void _emitSpaces() => _spacesCtrl.add(_readSpaces());
   void _emitSuggestLevel() => _suggestLevelCtrl.add(_readSuggestLevel());
   void _emitPreferredModel() => _preferredModelCtrl.add(_readPreferredModel());
+  void _emitStudents() {
+    /* no external stream yet */
+  }
 }

@@ -3,6 +3,7 @@ import 'add_api_key_sheet.dart';
 import 'dart:async';
 import '../main.dart';
 import '../data/models.dart';
+import '../recommended_spaces_page.dart';
 
 class ProfileSheet extends StatefulWidget {
   const ProfileSheet({super.key});
@@ -94,6 +95,8 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      _profileSummary(context),
                       const SizedBox(height: 12),
                       _section(
                         context,
@@ -225,6 +228,43 @@ class _ProfileSheetState extends State<ProfileSheet> {
                             ],
                           ),
                           const SizedBox(height: 10),
+                          // Recommended spaces entry
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A0A0A),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Color(0xFF2F3336)),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.recommend_outlined,
+                                color: Color(0xFF71767B),
+                              ),
+                              title: const Text('Recommended spaces'),
+                              subtitle: const Text(
+                                'Curated picks for research and study',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () async {
+                                final result = await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const RecommendedSpacesPage(),
+                                  ),
+                                );
+                                // Optionally show a toast if spaces were added
+                                if (!mounted) return;
+                                if (result == 'added') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Space added'),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           if (_spaces.isEmpty)
                             Wrap(
                               spacing: 8,
@@ -353,6 +393,43 @@ class _ProfileSheetState extends State<ProfileSheet> {
         const SizedBox(height: 10),
         ...children,
       ],
+    );
+  }
+
+  Widget _profileSummary(BuildContext context) {
+    final db = DBProvider.of(context);
+    final p = db.currentProfile;
+    final chips = <Widget>[];
+    if ((p.rollNo ?? '').isNotEmpty) {
+      chips.add(_infoChip('Roll: ${p.rollNo}'));
+    }
+    if ((p.section ?? '').isNotEmpty) {
+      chips.add(_infoChip('Section: ${p.section}'));
+    }
+    if ((p.group ?? '').isNotEmpty) {
+      chips.add(_infoChip('Group: ${p.group}'));
+    }
+    if ((p.branch ?? '').isNotEmpty) {
+      chips.add(_infoChip('Branch: ${p.branch}'));
+    }
+    if ((p.semester ?? 0) > 0) {
+      chips.add(_infoChip('Semester: Sem-${p.semester}'));
+    }
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+
+  Widget _infoChip(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF2F3336)),
+      ),
+      child: Text(text, style: const TextStyle(color: Color(0xFFE7E9EA))),
     );
   }
 

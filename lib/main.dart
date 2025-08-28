@@ -3,10 +3,29 @@ import 'package:flutter/services.dart';
 import 'onboarding.dart';
 import 'data/database_service.dart';
 import 'data/chat_service.dart';
+import 'data/models.dart';
+import 'data/student_suggestions.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = await DatabaseService.init();
+  // Seed students (one-time) from kStudentSuggestions if students box is empty
+  // We infer emptiness by checking a quick roll key that should exist if seeded.
+  // We don't expose box size; perform a cheap guess: attempt to find known roll
+  final probe = db.findStudentByExact('24BTAML01');
+  if (probe == null) {
+    final List<StudentModel> toSeed = kStudentSuggestions
+        .map(
+          (s) => StudentModel(
+            rollNo: s.rollNo,
+            name: s.name,
+            section: s.section ?? 'Section-A',
+            group: s.group,
+          ),
+        )
+        .toList(growable: false);
+    await db.upsertStudentsBulk(toSeed);
+  }
   final chat = ChatService(db);
   runApp(
     DBProvider(

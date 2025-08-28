@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:async';
 import 'chat_page.dart';
+import 'main.dart';
+import 'data/models.dart';
+import 'data/database_service.dart';
 
 class SpacePage extends StatefulWidget {
   const SpacePage({
@@ -21,6 +25,8 @@ class _SpacePageState extends State<SpacePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
   final List<_ResourceItem> _resources = [];
+  SpaceModel? _space;
+  StreamSubscription? _spacesSub;
 
   @override
   void initState() {
@@ -30,12 +36,63 @@ class _SpacePageState extends State<SpacePage>
       if (!mounted) return;
       setState(() {});
     });
+    // Defer DB access until after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final db = DBProvider.of(context);
+      _hydrateSpace(db);
+      _spacesSub?.cancel();
+      _spacesSub = db.spacesStream.listen((list) {
+        if (!mounted) return;
+        final s = list.firstWhere(
+          (e) => e.id == widget.spaceId,
+          orElse: () =>
+              _space ??
+              SpaceModel(
+                id: widget.spaceId,
+                name: widget.name,
+                emoji: widget.emoji,
+              ),
+        );
+        setState(() => _space = s);
+      });
+    });
   }
 
   @override
   void dispose() {
     _tab.dispose();
+    _spacesSub?.cancel();
     super.dispose();
+  }
+
+  void _hydrateSpace(DatabaseService db) {
+    final list = db.currentSpaces;
+    final s = list.firstWhere(
+      (e) => e.id == widget.spaceId,
+      orElse: () => SpaceModel(
+        id: widget.spaceId,
+        name: widget.name,
+        emoji: widget.emoji,
+      ),
+    );
+    setState(() => _space = s);
+  }
+
+  Future<void> _saveSpace({
+    String? description,
+    String? goals,
+    String? guide,
+  }) async {
+    if (_space == null) return;
+    final db = DBProvider.of(context);
+    final updated = _space!.copyWith(
+      description: description,
+      goals: goals,
+      guide: guide,
+    );
+    await db.upsertSpace(updated);
+    if (!mounted) return;
+    setState(() => _space = updated);
   }
 
   void _addResource() async {
@@ -60,11 +117,14 @@ class _SpacePageState extends State<SpacePage>
         titleSpacing: 0,
         title: Row(
           children: [
-            Text(widget.emoji, style: const TextStyle(fontSize: 18)),
+            Text(
+              _space?.emoji ?? widget.emoji,
+              style: const TextStyle(fontSize: 18),
+            ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                widget.name,
+                _space?.name ?? widget.name,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
@@ -102,7 +162,15 @@ class _SpacePageState extends State<SpacePage>
       body: TabBarView(
         controller: _tab,
         children: [
-          _StudyTab(spaceName: widget.name),
+          _StudyTab(
+            spaceName: _space?.name ?? widget.name,
+            description: _space?.description ?? '',
+            goals: _space?.goals ?? '',
+            guide: _space?.guide ?? '',
+            onEditDescription: (text) => _saveSpace(description: text),
+            onEditGoals: (text) => _saveSpace(goals: text),
+            onEditGuide: (text) => _saveSpace(guide: text),
+          ),
           _ResourcesTab(
             resources: _resources,
             onDelete: (id) {
@@ -116,14 +184,51 @@ class _SpacePageState extends State<SpacePage>
 }
 
 class _StudyTab extends StatelessWidget {
-  const _StudyTab({required this.spaceName});
+  const _StudyTab({
+    required this.spaceName,
+    required this.description,
+    required this.goals,
+    required this.guide,
+    required this.onEditDescription,
+    required this.onEditGoals,
+    required this.onEditGuide,
+  });
   final String spaceName;
+  final String description;
+  final String goals;
+  final String guide;
+  final ValueChanged<String> onEditDescription;
+  final ValueChanged<String> onEditGoals;
+  final ValueChanged<String> onEditGuide;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        _SectionTitle('Space details'),
+        const SizedBox(height: 8),
+        _EditableNoteCard(
+          title: 'Description',
+          text: description,
+          placeholder: 'Add a brief overview of this space',
+          onEdit: (txt) => onEditDescription(txt),
+        ),
+        const SizedBox(height: 8),
+        _EditableNoteCard(
+          title: 'Goals',
+          text: goals,
+          placeholder: 'List your goals or milestones',
+          onEdit: (txt) => onEditGoals(txt),
+        ),
+        const SizedBox(height: 8),
+        _EditableNoteCard(
+          title: 'Guide',
+          text: guide,
+          placeholder: 'Write tips, steps, or a study plan',
+          onEdit: (txt) => onEditGuide(txt),
+        ),
+        const SizedBox(height: 16),
         _SectionTitle('Study mode'),
         const SizedBox(height: 8),
         Wrap(
@@ -684,6 +789,133 @@ class _SuggestionChips extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+class _EditableNoteCard extends StatelessWidget {
+  const _EditableNoteCard({
+    required this.title,
+    required this.text,
+    required this.placeholder,
+    required this.onEdit,
+  });
+  final String title;
+  final String text;
+  final String placeholder;
+  final ValueChanged<String> onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasText = text.trim().isNotEmpty;
+    return InkWell(
+      onTap: () async {
+        final updated = await _editText(context, title, text);
+        if (updated != null) onEdit(updated);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2F3336)),
+        ),
+        child: ListTile(
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              hasText ? text : placeholder,
+              style: TextStyle(
+                color: hasText
+                    ? const Color(0xFFE7E9EA)
+                    : const Color(0xFF71767B),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _editText(
+    BuildContext context,
+    String title,
+    String initial,
+  ) async {
+    final ctrl = TextEditingController(text: initial);
+    String? result;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final insets = MediaQuery.of(ctx).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(bottom: insets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F3336),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Edit $title',
+                  style: Theme.of(
+                    ctx,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  maxLines: 8,
+                  decoration: InputDecoration(
+                    hintText: placeholder,
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).maybePop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () {
+                        result = ctrl.text.trim();
+                        Navigator.of(ctx).maybePop();
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return result;
   }
 }
 
