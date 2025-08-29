@@ -20,6 +20,8 @@ class _ProfileSheetState extends State<ProfileSheet> {
   String? _activeId;
   final List<SpaceModel> _spaces = [];
   StreamSubscription? _spacesSub;
+  String? _pexelsKey;
+  StreamSubscription? _pexelsSub;
 
   @override
   void didChangeDependencies() {
@@ -27,6 +29,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     _sub?.cancel();
     _activeSub?.cancel();
     _spacesSub?.cancel();
+    _pexelsSub?.cancel();
     final db = DBProvider.of(context);
     _keys
       ..clear()
@@ -35,6 +38,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     _spaces
       ..clear()
       ..addAll(db.currentSpaces);
+    _pexelsKey = db.currentPexelsApiKey;
     _sub = db.apiKeysStream.listen((list) {
       if (!mounted) return;
       setState(() {
@@ -55,6 +59,10 @@ class _ProfileSheetState extends State<ProfileSheet> {
           ..addAll(list);
       });
     });
+    _pexelsSub = db.pexelsApiKeyStream.listen((v) {
+      if (!mounted) return;
+      setState(() => _pexelsKey = v);
+    });
   }
 
   @override
@@ -62,6 +70,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     _sub?.cancel();
     _activeSub?.cancel();
     _spacesSub?.cancel();
+    _pexelsSub?.cancel();
     super.dispose();
   }
 
@@ -318,6 +327,54 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                   ),
                               ],
                             ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _section(
+                        context,
+                        title: 'Pexels API key',
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A0A0A),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.image_outlined,
+                                color: Color(0xFF71767B),
+                              ),
+                              title: Text(
+                                _pexelsKey == null || _pexelsKey!.isEmpty
+                                    ? 'Not configured'
+                                    : 'Configured',
+                              ),
+                              subtitle: Text(
+                                _pexelsKey == null || _pexelsKey!.isEmpty
+                                    ? 'Add a Pexels API key to load images for banners and gallery.'
+                                    : 'Used for loading banner and gallery images from Pexels.',
+                                style: const TextStyle(
+                                  color: Color(0xFF71767B),
+                                ),
+                              ),
+                              trailing: InputChip(
+                                label: const Text('manage'),
+                                avatar: const Icon(
+                                  Icons.settings_outlined,
+                                  size: 18,
+                                ),
+                                onPressed: _managePexelsKey,
+                                shape: const StadiumBorder(),
+                                backgroundColor: Color(0xFF0A0A0A),
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -673,6 +730,88 @@ class _ProfileSheetState extends State<ProfileSheet> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const OnboardingFlow()),
       (route) => false,
+    );
+  }
+
+  void _managePexelsKey() async {
+    final controller = TextEditingController(text: _pexelsKey ?? '');
+    final db = DBProvider.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final insets = MediaQuery.of(ctx).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(bottom: insets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F3336),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Pexels API key',
+                  style: Theme.of(
+                    ctx,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: 'API key',
+                    hintText: 'Paste your Pexels API key',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).maybePop(),
+                      child: const Text('Close'),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        await db.setPexelsApiKey(null);
+                        if (ctx.mounted) Navigator.of(ctx).maybePop();
+                      },
+                      child: const Text('Clear'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () async {
+                        final v = controller.text.trim();
+                        await db.setPexelsApiKey(v.isEmpty ? null : v);
+                        if (ctx.mounted) Navigator.of(ctx).maybePop();
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

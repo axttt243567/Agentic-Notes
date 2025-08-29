@@ -14,6 +14,7 @@ class DatabaseService {
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
   static const _preferredModelField = 'preferred_model';
+  static const _pexelsApiKeyField = 'pexels_api_key';
 
   late final Box _profile;
   late final Box _apiKeys;
@@ -27,6 +28,7 @@ class DatabaseService {
   final _spacesCtrl = StreamController<List<SpaceModel>>.broadcast();
   final _suggestLevelCtrl = StreamController<String>.broadcast();
   final _preferredModelCtrl = StreamController<String>.broadcast();
+  final _pexelsKeyCtrl = StreamController<String?>.broadcast();
   final _chatSessionsCtrl =
       StreamController<List<ChatSessionModel>>.broadcast();
 
@@ -36,6 +38,7 @@ class DatabaseService {
   Stream<List<SpaceModel>> get spacesStream => _spacesCtrl.stream;
   Stream<String> get suggestLevelStream => _suggestLevelCtrl.stream;
   Stream<String> get preferredModelStream => _preferredModelCtrl.stream;
+  Stream<String?> get pexelsApiKeyStream => _pexelsKeyCtrl.stream;
   Stream<List<ChatSessionModel>> get chatSessionsStream =>
       _chatSessionsCtrl.stream;
 
@@ -45,6 +48,7 @@ class DatabaseService {
   List<SpaceModel> get currentSpaces => _readSpaces();
   String get currentSuggestLevel => _readSuggestLevel();
   String get currentPreferredModel => _readPreferredModel();
+  String? get currentPexelsApiKey => _readPexelsApiKey();
   List<ChatSessionModel> get currentChatSessions => _readChatSessions();
 
   static Future<DatabaseService> init() async {
@@ -69,6 +73,7 @@ class DatabaseService {
     if (!svc._profile.containsKey(_preferredModelField)) {
       await svc._profile.put(_preferredModelField, 'gemini-2.5-flash-lite');
     }
+    // Do not seed pexels key; user provided
     svc._emitAll();
 
     // Watch for changes and emit
@@ -86,6 +91,9 @@ class DatabaseService {
     svc._profile
         .watch(key: _preferredModelField)
         .listen((_) => svc._emitPreferredModel());
+    svc._profile
+        .watch(key: _pexelsApiKeyField)
+        .listen((_) => svc._emitPexelsKey());
     return svc;
   }
 
@@ -96,6 +104,7 @@ class DatabaseService {
     _spacesCtrl.close();
     _suggestLevelCtrl.close();
     _preferredModelCtrl.close();
+    _pexelsKeyCtrl.close();
   }
 
   // Profile operations
@@ -159,6 +168,16 @@ class DatabaseService {
   Future<void> setPreferredModel(String model) async {
     await _profile.put(_preferredModelField, model);
     _emitPreferredModel();
+  }
+
+  // Pexels API key operations
+  Future<void> setPexelsApiKey(String? key) async {
+    if (key == null || key.trim().isEmpty) {
+      await _profile.delete(_pexelsApiKeyField);
+    } else {
+      await _profile.put(_pexelsApiKeyField, key.trim());
+    }
+    _emitPexelsKey();
   }
 
   // Spaces operations
@@ -299,6 +318,11 @@ class DatabaseService {
     return v ?? 'gemini-2.5-flash-lite';
   }
 
+  String? _readPexelsApiKey() {
+    final v = _profile.get(_pexelsApiKeyField) as String?;
+    return v;
+  }
+
   List<ChatSessionModel> _readChatSessions() {
     final items = <ChatSessionModel>[];
     for (final k in _chatSessions.keys) {
@@ -324,6 +348,7 @@ class DatabaseService {
   void _emitSpaces() => _spacesCtrl.add(_readSpaces());
   void _emitSuggestLevel() => _suggestLevelCtrl.add(_readSuggestLevel());
   void _emitPreferredModel() => _preferredModelCtrl.add(_readPreferredModel());
+  void _emitPexelsKey() => _pexelsKeyCtrl.add(_readPexelsApiKey());
   void _emitStudents() {
     /* no external stream yet */
   }

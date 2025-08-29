@@ -5,6 +5,7 @@ import 'chat_page.dart';
 import 'main.dart';
 import 'data/models.dart';
 import 'data/database_service.dart';
+import 'data/pexels_service.dart';
 
 class SpacePage extends StatefulWidget {
   const SpacePage({
@@ -27,11 +28,15 @@ class _SpacePageState extends State<SpacePage>
   final List<_ResourceItem> _resources = [];
   SpaceModel? _space;
   StreamSubscription? _spacesSub;
+  String? _pexelsKey;
+  StreamSubscription? _pexelsSub;
+  List<String> _bannerUrls = const [];
+  bool _loadingBanner = false;
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 3, vsync: this);
     _tab.addListener(() {
       if (!mounted) return;
       setState(() {});
@@ -40,6 +45,8 @@ class _SpacePageState extends State<SpacePage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final db = DBProvider.of(context);
       _hydrateSpace(db);
+      _pexelsKey = db.currentPexelsApiKey;
+      _maybeLoadBanner();
       _spacesSub?.cancel();
       _spacesSub = db.spacesStream.listen((list) {
         if (!mounted) return;
@@ -55,6 +62,14 @@ class _SpacePageState extends State<SpacePage>
         );
         setState(() => _space = s);
       });
+      _pexelsSub?.cancel();
+      _pexelsSub = db.pexelsApiKeyStream.listen((v) {
+        if (!mounted) return;
+        setState(() {
+          _pexelsKey = v;
+        });
+        _maybeLoadBanner();
+      });
     });
   }
 
@@ -62,6 +77,7 @@ class _SpacePageState extends State<SpacePage>
   void dispose() {
     _tab.dispose();
     _spacesSub?.cancel();
+    _pexelsSub?.cancel();
     super.dispose();
   }
 
@@ -76,6 +92,27 @@ class _SpacePageState extends State<SpacePage>
       ),
     );
     setState(() => _space = s);
+  }
+
+  Future<void> _maybeLoadBanner() async {
+    final query = (_space?.name ?? widget.name).trim();
+    if ((_pexelsKey ?? '').isEmpty || query.isEmpty) {
+      setState(() => _bannerUrls = const []);
+      return;
+    }
+    if (_loadingBanner) return;
+    _loadingBanner = true;
+    try {
+      final svc = PexelsService(_pexelsKey!);
+      final urls = await svc.searchImageUrls(query: query, perPage: 6);
+      if (!mounted) return;
+      setState(() => _bannerUrls = urls);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _bannerUrls = const []);
+    } finally {
+      _loadingBanner = false;
+    }
   }
 
   Future<void> _saveSpace({
@@ -149,6 +186,7 @@ class _SpacePageState extends State<SpacePage>
           tabs: const [
             Tab(text: 'Study'),
             Tab(text: 'Resources'),
+            Tab(text: 'Gallery'),
           ],
         ),
       ),
@@ -170,12 +208,19 @@ class _SpacePageState extends State<SpacePage>
             onEditDescription: (text) => _saveSpace(description: text),
             onEditGoals: (text) => _saveSpace(goals: text),
             onEditGuide: (text) => _saveSpace(guide: text),
+            banner: _BannerImage(urls: _bannerUrls),
           ),
           _ResourcesTab(
             resources: _resources,
             onDelete: (id) {
               setState(() => _resources.removeWhere((e) => e.id == id));
             },
+            banner: _BannerImage(urls: _bannerUrls),
+          ),
+          _PexelsGalleryTab(
+            query: _space?.name ?? widget.name,
+            pexelsKey: _pexelsKey,
+            onTapReload: _maybeLoadBanner,
           ),
         ],
       ),
@@ -192,6 +237,7 @@ class _StudyTab extends StatelessWidget {
     required this.onEditDescription,
     required this.onEditGoals,
     required this.onEditGuide,
+    required this.banner,
   });
   final String spaceName;
   final String description;
@@ -200,12 +246,15 @@ class _StudyTab extends StatelessWidget {
   final ValueChanged<String> onEditDescription;
   final ValueChanged<String> onEditGoals;
   final ValueChanged<String> onEditGuide;
+  final Widget banner;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        banner,
+        const SizedBox(height: 12),
         _SectionTitle('Space details'),
         const SizedBox(height: 8),
         _EditableNoteCard(
@@ -360,14 +409,22 @@ class _StudyTab extends StatelessWidget {
 }
 
 class _ResourcesTab extends StatelessWidget {
-  const _ResourcesTab({required this.resources, required this.onDelete});
+  const _ResourcesTab({
+    required this.resources,
+    required this.onDelete,
+    required this.banner,
+  });
   final List<_ResourceItem> resources;
   final ValueChanged<String> onDelete;
+  final Widget banner;
 
   @override
   Widget build(BuildContext context) {
     if (resources.isEmpty) {
-      return const _ResourcesEmpty();
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [banner, const SizedBox(height: 12), const _ResourcesEmpty()],
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -436,6 +493,222 @@ class _ResourcesTab extends StatelessWidget {
       case _ResourceType.text:
         return Icons.notes_outlined;
     }
+  }
+}
+
+class _BannerImage extends StatelessWidget {
+  const _BannerImage({required this.urls});
+  final List<String> urls;
+  @override
+  Widget build(BuildContext context) {
+    if (urls.isEmpty) {
+      return _fallbackBanner(context);
+    }
+    final url = urls.first;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(url, fit: BoxFit.cover),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.0),
+                    Colors.black.withOpacity(0.4),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackBanner(BuildContext context) {
+    return Container(
+      height: 170,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2F3336)),
+        color: const Color(0xFF0A0A0A),
+      ),
+      child: const Center(
+        child: Text(
+          'Add Pexels API key in Profile to load images',
+          style: TextStyle(color: Color(0xFF71767B)),
+        ),
+      ),
+    );
+  }
+}
+
+class _PexelsGalleryTab extends StatefulWidget {
+  const _PexelsGalleryTab({
+    required this.query,
+    required this.pexelsKey,
+    required this.onTapReload,
+  });
+  final String query;
+  final String? pexelsKey;
+  final Future<void> Function() onTapReload;
+
+  @override
+  State<_PexelsGalleryTab> createState() => _PexelsGalleryTabState();
+}
+
+class _PexelsGalleryTabState extends State<_PexelsGalleryTab> {
+  List<String> _urls = const [];
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void didUpdateWidget(covariant _PexelsGalleryTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query ||
+        oldWidget.pexelsKey != widget.pexelsKey) {
+      _fetch();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    final key = widget.pexelsKey;
+    if ((key ?? '').isEmpty) {
+      setState(() {
+        _urls = const [];
+        _error = 'Missing Pexels API key.';
+      });
+      return;
+    }
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final svc = PexelsService(key!);
+      final urls = await svc.searchImageUrls(query: widget.query, perPage: 30);
+      if (!mounted) return;
+      setState(() => _urls = urls);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Images for "${widget.query}"',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Reload',
+                icon: const Icon(Icons.refresh),
+                onPressed: _fetch,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Builder(
+            builder: (context) {
+              if ((_error ?? '').isNotEmpty) {
+                return _missingKeyOrError(context, _error!);
+              }
+              if (_loading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (_urls.isEmpty) {
+                return _missingKeyOrError(context, 'No images found.');
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: _urls.length,
+                itemBuilder: (context, i) {
+                  final u = _urls[i];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(u, fit: BoxFit.cover),
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.open_in_new, size: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _missingKeyOrError(BuildContext context, String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.image_outlined, size: 44, color: Colors.white60),
+            const SizedBox(height: 12),
+            Text(message, style: const TextStyle(color: Color(0xFF71767B))),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () async {
+                await widget.onTapReload();
+              },
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Configure in Profile'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
