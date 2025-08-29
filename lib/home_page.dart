@@ -5,6 +5,7 @@ import 'chat_page.dart';
 import 'space_page.dart';
 import 'data/models.dart';
 import 'dart:async';
+import 'chat_history_page.dart';
 
 /// Home page: minimal shell with a profile button.
 class HomePage extends StatefulWidget {
@@ -198,6 +199,13 @@ class _HomePageState extends State<HomePage> {
             tooltip: 'AI chat',
             onPressed: _openChat,
             icon: const Icon(Icons.auto_awesome),
+          ),
+          IconButton(
+            tooltip: 'Chat history',
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ChatHistoryPage())),
+            icon: const Icon(Icons.history),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),

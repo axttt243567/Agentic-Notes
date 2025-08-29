@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'widgets/universal_chat_toolbar.dart';
 import 'main.dart';
+import 'data/models.dart';
+import 'chat_history_page.dart';
 // DB access via DBProvider in main.dart
 import 'dart:async';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, this.title});
+  const ChatPage({super.key, this.title, this.sessionId, this.spaceId});
   final String? title;
+  final String? sessionId; // open existing
+  final String? spaceId; // optional link to a space
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -20,6 +24,9 @@ class _ChatPageState extends State<ChatPage> {
   String _model = 'gemini-2.5-flash-lite';
   _PendingTimer? _pending;
   bool _createImageActive = false;
+  String? _sessionId; // will generate on save if null
+  DateTime? _createdAt;
+  String? _titleOverride;
 
   @override
   void dispose() {
@@ -30,79 +37,106 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title ?? 'AI Chat'),
-        centerTitle: true,
-        actions: const [SizedBox(width: 4)],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // top toolbar removed per user request
-            Expanded(
-              child: _messages.isEmpty
-                  ? const _ChatEmpty()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                      reverse: true,
-                      itemCount: _messages.length + (_pending != null ? 1 : 0),
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        // With reverse: true, index 0 is newest at bottom.
-                        if (_pending != null && i == 0) {
-                          final t = _pending!;
-                          return Align(
-                            alignment: Alignment.centerLeft,
-                            child: _TimerBubble(elapsed: t.elapsed),
-                          );
-                        }
-                        final idx =
-                            _messages.length -
-                            1 -
-                            (i - (_pending != null ? 1 : 0));
-                        final m = _messages[idx];
-                        return Align(
-                          alignment: m.isUser
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width * .75,
-                            ),
-                            child: _MessageBubble(message: m),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            // divider removed for a cleaner minimal look
-            UniversalChatToolbar(
-              textFieldFocus: _inputFocus,
-              controller: _ctrl,
-              sending: _sending,
-              currentModel: _model,
-              onPickModel: _pickModel,
-              createImageActive: _createImageActive,
-              onAction: (a) {
-                if (a == ChatAction.text) return; // focus managed
-                if (a == ChatAction.createImage) {
-                  setState(() => _createImageActive = !_createImageActive);
-                  return;
-                }
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Action: ${a.name}')));
-              },
-              onSend: (t) {
-                if (_createImageActive) {
-                  _generateImageFromText();
-                } else {
-                  _send();
-                }
+    return WillPopScope(
+      onWillPop: () async {
+        await _saveSessionIfNeeded();
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              await _saveSessionIfNeeded();
+              if (mounted) Navigator.of(context).maybePop();
+            },
+          ),
+          title: Text(_titleOverride ?? widget.title ?? 'AI Chat'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              tooltip: 'History',
+              icon: const Icon(Icons.history),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ChatHistoryPage()),
+                );
               },
             ),
+            const SizedBox(width: 4),
           ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // top toolbar removed per user request
+              Expanded(
+                child: _messages.isEmpty
+                    ? const _ChatEmpty()
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                        reverse: true,
+                        itemCount:
+                            _messages.length + (_pending != null ? 1 : 0),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          // With reverse: true, index 0 is newest at bottom.
+                          if (_pending != null && i == 0) {
+                            final t = _pending!;
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: _TimerBubble(elapsed: t.elapsed),
+                            );
+                          }
+                          final idx =
+                              _messages.length -
+                              1 -
+                              (i - (_pending != null ? 1 : 0));
+                          final m = _messages[idx];
+                          return Align(
+                            alignment: m.isUser
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * .75,
+                              ),
+                              child: _MessageBubble(message: m),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              // divider removed for a cleaner minimal look
+              UniversalChatToolbar(
+                textFieldFocus: _inputFocus,
+                controller: _ctrl,
+                sending: _sending,
+                currentModel: _model,
+                onPickModel: _pickModel,
+                createImageActive: _createImageActive,
+                onAction: (a) {
+                  if (a == ChatAction.text) return; // focus managed
+                  if (a == ChatAction.createImage) {
+                    setState(() => _createImageActive = !_createImageActive);
+                    return;
+                  }
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Action: ${a.name}')));
+                },
+                onSend: (t) {
+                  if (_createImageActive) {
+                    _generateImageFromText();
+                  } else {
+                    _send();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -213,6 +247,28 @@ class _ChatPageState extends State<ChatPage> {
     // Load preferred model from DB
     final db = DBProvider.of(context);
     _model = db.currentPreferredModel;
+    // Load a session if provided
+    if (_sessionId == null && widget.sessionId != null) {
+      final s = db.getChatSession(widget.sessionId!);
+      if (s != null) {
+        _sessionId = s.id;
+        _createdAt = s.createdAt;
+        _model = s.model;
+        _titleOverride = s.title;
+        _messages
+          ..clear()
+          ..addAll(
+            s.messages.map(
+              (m) => _ChatMessage(
+                text: m.text,
+                isUser: m.role == 'user',
+                imageUrls: m.imageUrls,
+              ),
+            ),
+          );
+        setState(() {});
+      }
+    }
   }
 
   String _formatElapsed(Duration d) {
@@ -308,6 +364,78 @@ class _ChatEmpty extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+extension on _ChatMessage {
+  ChatMessageModel toModel() => ChatMessageModel(
+    id: DateTime.now().microsecondsSinceEpoch.toString(),
+    role: isUser ? 'user' : 'model',
+    text: text,
+    imageUrls: imageUrls,
+    ts: DateTime.now(),
+  );
+}
+
+extension on List<_ChatMessage> {
+  List<ChatMessageModel> toModels() => map((e) => e.toModel()).toList();
+}
+
+extension on List<_ChatMessage> {
+  String lastNonEmptyTextSnippet([int max = 140]) {
+    for (final m in _rev()) {
+      if (m.text.trim().isNotEmpty) {
+        final t = m.text.trim().replaceAll('\n', ' ');
+        return t.length <= max ? t : '${t.substring(0, max)}…';
+      }
+    }
+    return '';
+  }
+}
+
+extension<T> on List<T> {
+  Iterable<T> _rev() sync* {
+    for (var i = length - 1; i >= 0; i--) yield this[i];
+  }
+}
+
+extension _SaveSession on _ChatPageState {
+  Future<void> _saveSessionIfNeeded() async {
+    if (_messages.isEmpty) return; // nothing to save
+    final db = DBProvider.of(context);
+    final now = DateTime.now();
+    final id = _sessionId ?? now.millisecondsSinceEpoch.toString();
+    final created = _createdAt ?? now;
+    final title = _deriveTitle();
+    final model = _model;
+    final msgs = _messages.toModels();
+    final session = ChatSessionModel(
+      id: id,
+      title: title,
+      model: model,
+      createdAt: created,
+      updatedAt: now,
+      messageCount: msgs.length,
+      spaceId: widget.spaceId,
+      lastSnippet: _messages.lastNonEmptyTextSnippet(160),
+      messages: msgs,
+    );
+    await db.upsertChatSession(session);
+    _sessionId = id;
+    _createdAt = created;
+    _titleOverride = title;
+  }
+
+  String _deriveTitle() {
+    if ((_titleOverride ?? '').trim().isNotEmpty) return _titleOverride!;
+    // Title from first user message
+    for (final m in _messages) {
+      if (m.isUser && m.text.trim().isNotEmpty) {
+        final line = m.text.trim().split('\n').first;
+        return line.length <= 40 ? line : '${line.substring(0, 40)}…';
+      }
+    }
+    return 'Chat';
   }
 }
 

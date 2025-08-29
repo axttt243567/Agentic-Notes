@@ -9,6 +9,7 @@ class DatabaseService {
   static const _boxApiKeys = 'api_keys_box';
   static const _boxSpaces = 'spaces_box';
   static const _boxStudents = 'students_box';
+  static const _boxChatSessions = 'chat_sessions_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -18,6 +19,7 @@ class DatabaseService {
   late final Box _apiKeys;
   late final Box _spaces;
   late final Box _students;
+  late final Box _chatSessions;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -25,6 +27,8 @@ class DatabaseService {
   final _spacesCtrl = StreamController<List<SpaceModel>>.broadcast();
   final _suggestLevelCtrl = StreamController<String>.broadcast();
   final _preferredModelCtrl = StreamController<String>.broadcast();
+  final _chatSessionsCtrl =
+      StreamController<List<ChatSessionModel>>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
@@ -32,6 +36,8 @@ class DatabaseService {
   Stream<List<SpaceModel>> get spacesStream => _spacesCtrl.stream;
   Stream<String> get suggestLevelStream => _suggestLevelCtrl.stream;
   Stream<String> get preferredModelStream => _preferredModelCtrl.stream;
+  Stream<List<ChatSessionModel>> get chatSessionsStream =>
+      _chatSessionsCtrl.stream;
 
   UserProfileModel get currentProfile => _readProfile();
   List<ApiKeyModel> get currentApiKeys => _readApiKeys();
@@ -39,6 +45,7 @@ class DatabaseService {
   List<SpaceModel> get currentSpaces => _readSpaces();
   String get currentSuggestLevel => _readSuggestLevel();
   String get currentPreferredModel => _readPreferredModel();
+  List<ChatSessionModel> get currentChatSessions => _readChatSessions();
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -47,6 +54,7 @@ class DatabaseService {
     svc._apiKeys = await Hive.openBox(_boxApiKeys);
     svc._spaces = await Hive.openBox(_boxSpaces);
     svc._students = await Hive.openBox(_boxStudents);
+    svc._chatSessions = await Hive.openBox(_boxChatSessions);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -68,6 +76,7 @@ class DatabaseService {
     svc._apiKeys.watch().listen((_) => svc._emitApiKeys());
     svc._spaces.watch().listen((_) => svc._emitSpaces());
     svc._students.watch().listen((_) => svc._emitStudents());
+    svc._chatSessions.watch().listen((_) => svc._emitChatSessions());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -173,6 +182,23 @@ class DatabaseService {
     _emitStudents();
   }
 
+  // Chat sessions operations
+  Future<void> upsertChatSession(ChatSessionModel session) async {
+    await _chatSessions.put(session.id, session.toJson());
+    _emitChatSessions();
+  }
+
+  Future<void> deleteChatSession(String id) async {
+    await _chatSessions.delete(id);
+    _emitChatSessions();
+  }
+
+  ChatSessionModel? getChatSession(String id) {
+    final json = _chatSessions.get(id) as Map?;
+    if (json == null) return null;
+    return ChatSessionModel.fromJson(json.cast<String, dynamic>());
+  }
+
   Future<void> upsertStudent(StudentModel student) async {
     await _students.put(student.rollNo, student.toJson());
     _emitStudents();
@@ -273,6 +299,17 @@ class DatabaseService {
     return v ?? 'gemini-2.5-flash-lite';
   }
 
+  List<ChatSessionModel> _readChatSessions() {
+    final items = <ChatSessionModel>[];
+    for (final k in _chatSessions.keys) {
+      final json = (_chatSessions.get(k) as Map).cast<String, dynamic>();
+      items.add(ChatSessionModel.fromJson(json));
+    }
+    // sort by updatedAt desc
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  }
+
   void _emitAll() {
     _emitProfile();
     _emitApiKeys();
@@ -289,5 +326,30 @@ class DatabaseService {
   void _emitPreferredModel() => _preferredModelCtrl.add(_readPreferredModel());
   void _emitStudents() {
     /* no external stream yet */
+  }
+  void _emitChatSessions() => _chatSessionsCtrl.add(_readChatSessions());
+
+  /// Danger zone: wipes all persisted app data and re-seeds minimal defaults.
+  /// This clears profile, API keys, spaces, students, and chat sessions.
+  /// After completion, streams are emitted with the fresh state.
+  Future<void> wipeAllData() async {
+    await Future.wait([
+      _profile.clear(),
+      _apiKeys.clear(),
+      _spaces.clear(),
+      _students.clear(),
+      _chatSessions.clear(),
+    ]);
+
+    // Re-seed minimal defaults expected by the UI
+    await _profile.put(
+      'user',
+      const UserProfileModel(displayName: 'You').toJson(),
+    );
+    await _profile.put(_suggestLevelField, 'balanced');
+    await _profile.put(_preferredModelField, 'gemini-2.5-flash-lite');
+
+    _emitAll();
+    _emitChatSessions();
   }
 }

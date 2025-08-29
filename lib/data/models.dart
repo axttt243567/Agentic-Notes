@@ -181,3 +181,134 @@ class StudentModel {
     semester: json['semester'] as int?,
   );
 }
+
+@immutable
+class ChatMessageModel {
+  final String id; // unique within session
+  final String role; // 'user' | 'model'
+  final String text;
+  final List<String>? imageUrls;
+  final DateTime ts;
+
+  const ChatMessageModel({
+    required this.id,
+    required this.role,
+    required this.text,
+    this.imageUrls,
+    required this.ts,
+  });
+
+  ChatMessageModel copyWith({
+    String? id,
+    String? role,
+    String? text,
+    List<String>? imageUrls,
+    DateTime? ts,
+  }) => ChatMessageModel(
+    id: id ?? this.id,
+    role: role ?? this.role,
+    text: text ?? this.text,
+    imageUrls: imageUrls ?? this.imageUrls,
+    ts: ts ?? this.ts,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'role': role,
+    'text': text,
+    if (imageUrls != null && imageUrls!.isNotEmpty) 'imageUrls': imageUrls,
+    'ts': ts.toIso8601String(),
+  };
+
+  factory ChatMessageModel.fromJson(Map<String, dynamic> json) =>
+      ChatMessageModel(
+        id: json['id'] as String,
+        role: json['role'] as String,
+        text: json['text'] as String? ?? '',
+        imageUrls: (json['imageUrls'] as List?)?.cast<String>(),
+        ts:
+            DateTime.tryParse(json['ts'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}
+
+@immutable
+class ChatSessionModel {
+  final String id; // unique
+  final String title;
+  final String model; // e.g., gemini-2.5-flash-lite
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final int messageCount;
+  final String? spaceId; // optional link to a space
+  final String? lastSnippet; // for quick preview in list
+  final List<ChatMessageModel> messages; // persisted inline for simplicity
+
+  const ChatSessionModel({
+    required this.id,
+    required this.title,
+    required this.model,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.messageCount,
+    this.spaceId,
+    this.lastSnippet,
+    required this.messages,
+  });
+
+  ChatSessionModel copyWith({
+    String? id,
+    String? title,
+    String? model,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    int? messageCount,
+    String? spaceId,
+    String? lastSnippet,
+    List<ChatMessageModel>? messages,
+  }) => ChatSessionModel(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    model: model ?? this.model,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    messageCount: messageCount ?? this.messageCount,
+    spaceId: spaceId ?? this.spaceId,
+    lastSnippet: lastSnippet ?? this.lastSnippet,
+    messages: messages ?? this.messages,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'model': model,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'messageCount': messageCount,
+    if (spaceId != null) 'spaceId': spaceId,
+    if (lastSnippet != null) 'lastSnippet': lastSnippet,
+    'messages': messages.map((m) => m.toJson()).toList(growable: false),
+  };
+
+  factory ChatSessionModel.fromJson(Map<String, dynamic> json) =>
+      ChatSessionModel(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? 'Chat',
+        model: json['model'] as String? ?? 'gemini-2.5-flash-lite',
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        messageCount: (json['messageCount'] as num?)?.toInt() ?? 0,
+        spaceId: json['spaceId'] as String?,
+        lastSnippet: json['lastSnippet'] as String?,
+        messages: ((json['messages'] as List?) ?? const [])
+            .map(
+              (e) =>
+                  ChatMessageModel.fromJson((e as Map).cast<String, dynamic>()),
+            )
+            .toList(growable: false),
+      );
+}

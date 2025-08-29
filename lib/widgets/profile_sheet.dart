@@ -4,6 +4,7 @@ import 'dart:async';
 import '../main.dart';
 import '../data/models.dart';
 import '../recommended_spaces_page.dart';
+import '../onboarding.dart';
 
 class ProfileSheet extends StatefulWidget {
   const ProfileSheet({super.key});
@@ -341,6 +342,35 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      _section(
+                        context,
+                        title: 'Danger zone',
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A0A0A),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Color(0xFF2F3336)),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.delete_forever_outlined,
+                                color: Colors.redAccent,
+                              ),
+                              title: const Text(
+                                'Delete all data',
+                                style: TextStyle(color: Color(0xFFE7E9EA)),
+                              ),
+                              subtitle: const Text(
+                                'Clears API keys, chats, spaces, students, and profile',
+                                style: TextStyle(color: Color(0xFF71767B)),
+                              ),
+                              onTap: _confirmAndWipeAll,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -626,6 +656,24 @@ class _ProfileSheetState extends State<ProfileSheet> {
     final db = DBProvider.of(context);
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     db.upsertSpace(SpaceModel(id: id, name: name, emoji: emoji));
+  }
+
+  Future<void> _confirmAndWipeAll() async {
+    final ok = await _confirm(
+      context,
+      'This will permanently delete all app data on this device. Continue?',
+    );
+    if (ok != true || !mounted) return;
+    final db = DBProvider.of(context);
+    await db.wipeAllData();
+    if (!mounted) return;
+    // Pop the profile sheet
+    Navigator.of(context).pop();
+    // Restart flow by replacing with Onboarding
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const OnboardingFlow()),
+      (route) => false,
+    );
   }
 }
 
