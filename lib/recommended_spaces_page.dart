@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'data/models.dart';
+import 'data/image_search.dart';
 
 class RecommendedSpacesPage extends StatelessWidget {
   const RecommendedSpacesPage({super.key});
@@ -8,16 +9,28 @@ class RecommendedSpacesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cats = _categories();
+    // Build up to a total of 5 recommendations across all categories.
+    const totalLimit = 5;
+    var shown = 0;
+    final sections = <Widget>[];
+
+    for (final c in cats) {
+      if (shown >= totalLimit) break;
+      final remaining = totalLimit - shown;
+      final recs = c.recs.take(remaining).toList();
+      if (recs.isEmpty) continue;
+      sections.addAll([
+        _CategorySection(title: c.title, recommendations: recs),
+        const SizedBox(height: 16),
+      ]);
+      shown += recs.length;
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Recommended spaces')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          for (final c in cats) ...[
-            _CategorySection(title: c.title, recommendations: c.recs),
-            const SizedBox(height: 16),
-          ],
-        ],
+        children: sections,
       ),
     );
   }
@@ -61,26 +74,239 @@ class _RecommendChip extends StatelessWidget {
     return InputChip(
       label: Text('${rec.emoji} ${rec.name}'),
       onPressed: () async {
-        final db = DBProvider.of(context);
-        final id = DateTime.now().millisecondsSinceEpoch.toString();
-        await db.upsertSpace(
-          SpaceModel(
-            id: id,
-            name: rec.name,
-            emoji: rec.emoji,
-            description: rec.description,
-            goals: rec.goals,
-            guide: rec.guide,
-          ),
+        final addedName = await Navigator.of(context).push<String>(
+          MaterialPageRoute(builder: (_) => _SpacePreviewPage(rec: rec)),
         );
         if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Added "${rec.name}"')));
+        if (addedName != null && addedName.isNotEmpty) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Added "$addedName"')));
+        }
       },
       shape: const StadiumBorder(),
       backgroundColor: const Color(0xFF0A0A0A),
       side: const BorderSide(color: Color(0xFF2F3336)),
+    );
+  }
+}
+
+class _SpacePreviewPage extends StatefulWidget {
+  const _SpacePreviewPage({required this.rec});
+  final _Rec rec;
+
+  @override
+  State<_SpacePreviewPage> createState() => _SpacePreviewPageState();
+}
+
+class _SpacePreviewPageState extends State<_SpacePreviewPage> {
+  List<String> _images = const [];
+  bool _loading = true;
+  bool _hasKey = true;
+
+  List<String> _parseGoals(String goals) {
+    return goals
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .map((e) => e.startsWith('•') ? e.substring(1).trim() : e)
+        .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    () async {
+      final images = await fetchRelatedImages(widget.rec.name, limit: 8);
+      if (!mounted) return;
+      setState(() {
+        _images = images;
+        _loading = false;
+        _hasKey = images.isNotEmpty; // if key missing, we get empty list
+      });
+    }();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rec = widget.rec;
+    final goals = _parseGoals(rec.goals);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Preview space')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          // Hero image if available
+          if (!_loading && _images.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.network(
+                  _images.first,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    color: const Color(0xFF1A1A1A),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.image_not_supported, size: 32),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(rec.emoji, style: const TextStyle(fontSize: 40)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  rec.name,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(rec.description, style: theme.textTheme.bodyLarge),
+          const SizedBox(height: 16),
+          // Related images
+          if (_loading)
+            const SizedBox(
+              height: 110,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_images.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Related images',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF71767B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 110,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (context, index) {
+                      final url = _images[index];
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => Container(
+                              color: const Color(0xFF1A1A1A),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                size: 24,
+                              ),
+                            ),
+                            loadingBuilder: (c, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: const Color(0xFF1A1A1A),
+                                alignment: Alignment.center,
+                                child: const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemCount: _images.length,
+                  ),
+                ),
+              ],
+            )
+          else if (_hasKey)
+            const SizedBox.shrink()
+          else
+            // Missing API key; keep UI clean without errors.
+            const SizedBox.shrink(),
+          const SizedBox(height: 16),
+          const Divider(height: 24),
+          Text(
+            'Goals',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF71767B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (goals.isEmpty)
+            Text('—', style: theme.textTheme.bodyMedium)
+          else
+            ...goals.map(
+              (g) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• '),
+                    Expanded(child: Text(g)),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Guide',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF71767B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(rec.guide, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 80),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Add space'),
+            onPressed: () async {
+              final db = DBProvider.of(context);
+              final id = DateTime.now().millisecondsSinceEpoch.toString();
+              await db.upsertSpace(
+                SpaceModel(
+                  id: id,
+                  name: widget.rec.name,
+                  emoji: widget.rec.emoji,
+                  description: widget.rec.description,
+                  goals: widget.rec.goals,
+                  guide: widget.rec.guide,
+                ),
+              );
+              if (!context.mounted) return;
+              Navigator.of(context).pop<String>(widget.rec.name);
+            },
+          ),
+        ),
+      ),
     );
   }
 }

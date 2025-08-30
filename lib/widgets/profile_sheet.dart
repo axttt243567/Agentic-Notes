@@ -5,6 +5,7 @@ import '../main.dart';
 import '../data/models.dart';
 import '../recommended_spaces_page.dart';
 import '../onboarding.dart';
+import '../profile_page.dart';
 
 class ProfileSheet extends StatefulWidget {
   const ProfileSheet({super.key});
@@ -106,7 +107,29 @@ class _ProfileSheetState extends State<ProfileSheet> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _profileSummary(context),
+                      // View profile option
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2F3336)),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.person_outline,
+                            color: Color(0xFF71767B),
+                          ),
+                          title: const Text('View profile'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ProfilePage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       _section(
                         context,
@@ -120,9 +143,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0A0A0A),
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: Color(0xFF2F3336)),
+                                  border: Border.all(
+                                    color: const Color(0xFF2F3336),
+                                  ),
                                 ),
                                 child: Text(
                                   '${_keys.length} key${_keys.length == 1 ? '' : 's'}',
@@ -136,7 +161,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 label: const Text('+ add'),
                                 onPressed: _addApiKey,
                                 shape: const StadiumBorder(),
-                                backgroundColor: Color(0xFF0A0A0A),
+                                backgroundColor: Colors.transparent,
                                 side: const BorderSide(
                                   color: Color(0xFF2F3336),
                                 ),
@@ -166,7 +191,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                     label: const Text('+ add'),
                                     onPressed: _addApiKey,
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Color(0xFF0A0A0A),
+                                    backgroundColor: Colors.transparent,
                                     side: const BorderSide(
                                       color: Color(0xFF2F3336),
                                     ),
@@ -177,9 +202,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           else
                             Container(
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0A0A0A),
+                                color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Color(0xFF2F3336)),
+                                border: Border.all(
+                                  color: const Color(0xFF2F3336),
+                                ),
                               ),
                               child: Column(
                                 children: [
@@ -214,9 +241,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0A0A0A),
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: Color(0xFF2F3336)),
+                                  border: Border.all(
+                                    color: const Color(0xFF2F3336),
+                                  ),
                                 ),
                                 child: Text(
                                   '${_spaces.length} space${_spaces.length == 1 ? '' : 's'}',
@@ -230,7 +259,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 label: const Text('+ new'),
                                 onPressed: _createSpace,
                                 shape: const StadiumBorder(),
-                                backgroundColor: Color(0xFF0A0A0A),
+                                backgroundColor: Colors.transparent,
                                 side: const BorderSide(
                                   color: Color(0xFF2F3336),
                                 ),
@@ -241,9 +270,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           // Recommended spaces entry
                           Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0A0A0A),
+                              color: Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Color(0xFF2F3336)),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
                             ),
                             child: ListTile(
                               leading: const Icon(
@@ -293,7 +324,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                     onPressed: () =>
                                         _quickCreateSpace(s[0], s[1]),
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Color(0xFF0A0A0A),
+                                    backgroundColor: Colors.transparent,
                                     side: const BorderSide(
                                       color: Color(0xFF2F3336),
                                     ),
@@ -320,7 +351,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                       );
                                     },
                                     shape: const StadiumBorder(),
-                                    backgroundColor: Color(0xFF0A0A0A),
+                                    backgroundColor: Colors.transparent,
                                     side: const BorderSide(
                                       color: Color(0xFF2F3336),
                                     ),
@@ -336,7 +367,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                         children: [
                           Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0A0A0A),
+                              color: Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: const Color(0xFF2F3336),
@@ -368,7 +399,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                                 ),
                                 onPressed: _managePexelsKey,
                                 shape: const StadiumBorder(),
-                                backgroundColor: Color(0xFF0A0A0A),
+                                backgroundColor: Colors.transparent,
                                 side: const BorderSide(
                                   color: Color(0xFF2F3336),
                                 ),
@@ -406,9 +437,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
                         children: [
                           Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0A0A0A),
+                              color: Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Color(0xFF2F3336)),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
                             ),
                             child: ListTile(
                               leading: const Icon(
@@ -455,7 +488,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
       height: 4,
       margin: const EdgeInsets.fromLTRB(0, 8, 0, 12),
       decoration: BoxDecoration(
-        color: Color(0xFF2F3336),
+        color: const Color(0xFF2F3336),
         borderRadius: BorderRadius.circular(999),
       ),
     ),
@@ -474,49 +507,12 @@ class _ProfileSheetState extends State<ProfileSheet> {
           title,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: Color(0xFF71767B),
+            color: const Color(0xFF71767B),
           ),
         ),
         const SizedBox(height: 10),
         ...children,
       ],
-    );
-  }
-
-  Widget _profileSummary(BuildContext context) {
-    final db = DBProvider.of(context);
-    final p = db.currentProfile;
-    final chips = <Widget>[];
-    if ((p.rollNo ?? '').isNotEmpty) {
-      chips.add(_infoChip('Roll: ${p.rollNo}'));
-    }
-    if ((p.section ?? '').isNotEmpty) {
-      chips.add(_infoChip('Section: ${p.section}'));
-    }
-    if ((p.group ?? '').isNotEmpty) {
-      chips.add(_infoChip('Group: ${p.group}'));
-    }
-    if ((p.branch ?? '').isNotEmpty) {
-      chips.add(_infoChip('Branch: ${p.branch}'));
-    }
-    if ((p.semester ?? 0) > 0) {
-      chips.add(_infoChip('Semester: Sem-${p.semester}'));
-    }
-    if (chips.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Wrap(spacing: 8, runSpacing: 8, children: chips);
-  }
-
-  Widget _infoChip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF2F3336)),
-      ),
-      child: Text(text, style: const TextStyle(color: Color(0xFFE7E9EA))),
     );
   }
 
@@ -560,7 +556,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
         avatar: const Icon(Icons.settings_outlined, size: 18),
         onPressed: onManage,
         shape: const StadiumBorder(),
-        backgroundColor: Color(0xFF0A0A0A),
+        backgroundColor: Colors.transparent,
         side: const BorderSide(color: Color(0xFF2F3336)),
       ),
     );
@@ -660,9 +656,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
   Widget _aboutCard() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF2F3336)),
+        border: Border.all(color: const Color(0xFF2F3336)),
       ),
       child: const ListTile(
         leading: Icon(Icons.info_outline),
