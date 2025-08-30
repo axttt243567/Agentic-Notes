@@ -312,3 +312,282 @@ class ChatSessionModel {
             .toList(growable: false),
       );
 }
+
+@immutable
+class MemoryItemModel {
+  final String id; // unique
+  final String title;
+  final String content;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const MemoryItemModel({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  MemoryItemModel copyWith({
+    String? id,
+    String? title,
+    String? content,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MemoryItemModel(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    content: content ?? this.content,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'content': content,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory MemoryItemModel.fromJson(Map<String, dynamic> json) =>
+      MemoryItemModel(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? '',
+        content: json['content'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}
+
+@immutable
+class ChatAnalyticsModel {
+  final String sessionId;
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final int durationSeconds;
+  final int totalMessages;
+  final int userRequestCount;
+  final int modelResponseCount;
+  final int userCharsTotal;
+  final int modelCharsTotal;
+  final int userTokensTotal; // estimated
+  final int modelTokensTotal; // estimated
+  final double avgModelTokensPerResponse;
+
+  const ChatAnalyticsModel({
+    required this.sessionId,
+    required this.startedAt,
+    required this.endedAt,
+    required this.durationSeconds,
+    required this.totalMessages,
+    required this.userRequestCount,
+    required this.modelResponseCount,
+    required this.userCharsTotal,
+    required this.modelCharsTotal,
+    required this.userTokensTotal,
+    required this.modelTokensTotal,
+    required this.avgModelTokensPerResponse,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'sessionId': sessionId,
+    'startedAt': startedAt.toIso8601String(),
+    'endedAt': endedAt.toIso8601String(),
+    'durationSeconds': durationSeconds,
+    'totalMessages': totalMessages,
+    'userRequestCount': userRequestCount,
+    'modelResponseCount': modelResponseCount,
+    'userCharsTotal': userCharsTotal,
+    'modelCharsTotal': modelCharsTotal,
+    'userTokensTotal': userTokensTotal,
+    'modelTokensTotal': modelTokensTotal,
+    'avgModelTokensPerResponse': avgModelTokensPerResponse,
+  };
+
+  factory ChatAnalyticsModel.fromJson(Map<String, dynamic> json) =>
+      ChatAnalyticsModel(
+        sessionId: json['sessionId'] as String,
+        startedAt:
+            DateTime.tryParse(json['startedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        endedAt:
+            DateTime.tryParse(json['endedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
+        totalMessages: (json['totalMessages'] as num?)?.toInt() ?? 0,
+        userRequestCount: (json['userRequestCount'] as num?)?.toInt() ?? 0,
+        modelResponseCount: (json['modelResponseCount'] as num?)?.toInt() ?? 0,
+        userCharsTotal: (json['userCharsTotal'] as num?)?.toInt() ?? 0,
+        modelCharsTotal: (json['modelCharsTotal'] as num?)?.toInt() ?? 0,
+        userTokensTotal: (json['userTokensTotal'] as num?)?.toInt() ?? 0,
+        modelTokensTotal: (json['modelTokensTotal'] as num?)?.toInt() ?? 0,
+        avgModelTokensPerResponse:
+            (json['avgModelTokensPerResponse'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+@immutable
+class SubMemoryPieceModel {
+  final String id; // unique
+  final String sessionId;
+  final List<String> messageIds; // provenance
+  final String title;
+  final String content;
+  final List<String> hashtags; // 10-20 ideally
+  final String summary; // 1-3 sentences
+  final DateTime createdAt;
+
+  const SubMemoryPieceModel({
+    required this.id,
+    required this.sessionId,
+    required this.messageIds,
+    required this.title,
+    required this.content,
+    required this.hashtags,
+    required this.summary,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'sessionId': sessionId,
+    'messageIds': messageIds,
+    'title': title,
+    'content': content,
+    'hashtags': hashtags,
+    'summary': summary,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory SubMemoryPieceModel.fromJson(Map<String, dynamic> json) =>
+      SubMemoryPieceModel(
+        id: json['id'] as String,
+        sessionId: json['sessionId'] as String,
+        messageIds: ((json['messageIds'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(growable: false),
+        title: json['title'] as String? ?? '',
+        content: json['content'] as String? ?? '',
+        hashtags: ((json['hashtags'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(growable: false),
+        summary: json['summary'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}
+
+@immutable
+class CoreMemorySectionModel {
+  final String id; // unique
+  final String sessionId;
+  final String title;
+  final String summary;
+  final List<String> hashtags; // core tags for the section
+  final List<SubMemoryPieceModel> pieces; // grouped pieces
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const CoreMemorySectionModel({
+    required this.id,
+    required this.sessionId,
+    required this.title,
+    required this.summary,
+    required this.hashtags,
+    required this.pieces,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'sessionId': sessionId,
+    'title': title,
+    'summary': summary,
+    'hashtags': hashtags,
+    'pieces': pieces.map((e) => e.toJson()).toList(growable: false),
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory CoreMemorySectionModel.fromJson(Map<String, dynamic> json) =>
+      CoreMemorySectionModel(
+        id: json['id'] as String,
+        sessionId: json['sessionId'] as String,
+        title: json['title'] as String? ?? '',
+        summary: json['summary'] as String? ?? '',
+        hashtags: ((json['hashtags'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(growable: false),
+        pieces: ((json['pieces'] as List?) ?? const [])
+            .map(
+              (e) => SubMemoryPieceModel.fromJson(
+                (e as Map).cast<String, dynamic>(),
+              ),
+            )
+            .toList(growable: false),
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}
+
+@immutable
+class MemoryIndexModel {
+  final String sessionId; // owner session
+  final DateTime generatedAt;
+  final ChatAnalyticsModel analytics;
+  final List<CoreMemorySectionModel> sections;
+  final String? sessionSummary; // ~30 words
+  final List<String>? sessionHashtags; // 10-20 like #word1_word2
+
+  const MemoryIndexModel({
+    required this.sessionId,
+    required this.generatedAt,
+    required this.analytics,
+    required this.sections,
+    this.sessionSummary,
+    this.sessionHashtags,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'sessionId': sessionId,
+    'generatedAt': generatedAt.toIso8601String(),
+    'analytics': analytics.toJson(),
+    'sections': sections.map((s) => s.toJson()).toList(growable: false),
+    if (sessionSummary != null) 'sessionSummary': sessionSummary,
+    if (sessionHashtags != null) 'sessionHashtags': sessionHashtags,
+  };
+
+  factory MemoryIndexModel.fromJson(Map<String, dynamic> json) =>
+      MemoryIndexModel(
+        sessionId: json['sessionId'] as String,
+        generatedAt:
+            DateTime.tryParse(json['generatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        analytics: ChatAnalyticsModel.fromJson(
+          (json['analytics'] as Map).cast<String, dynamic>(),
+        ),
+        sections: ((json['sections'] as List?) ?? const [])
+            .map(
+              (e) => CoreMemorySectionModel.fromJson(
+                (e as Map).cast<String, dynamic>(),
+              ),
+            )
+            .toList(growable: false),
+        sessionSummary: json['sessionSummary'] as String?,
+        sessionHashtags: (json['sessionHashtags'] as List?)
+            ?.map((e) => e.toString())
+            .toList(),
+      );
+}

@@ -10,6 +10,8 @@ class DatabaseService {
   static const _boxSpaces = 'spaces_box';
   static const _boxStudents = 'students_box';
   static const _boxChatSessions = 'chat_sessions_box';
+  static const _boxMemories = 'memories_box';
+  static const _boxMemoryIndex = 'memory_index_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -21,6 +23,8 @@ class DatabaseService {
   late final Box _spaces;
   late final Box _students;
   late final Box _chatSessions;
+  late final Box _memories;
+  late final Box _memoryIndex;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -31,6 +35,9 @@ class DatabaseService {
   final _pexelsKeyCtrl = StreamController<String?>.broadcast();
   final _chatSessionsCtrl =
       StreamController<List<ChatSessionModel>>.broadcast();
+  final _memoriesCtrl = StreamController<List<MemoryItemModel>>.broadcast();
+  final _memoryIndexCtrl =
+      StreamController<Map<String, MemoryIndexModel>>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
@@ -41,6 +48,9 @@ class DatabaseService {
   Stream<String?> get pexelsApiKeyStream => _pexelsKeyCtrl.stream;
   Stream<List<ChatSessionModel>> get chatSessionsStream =>
       _chatSessionsCtrl.stream;
+  Stream<List<MemoryItemModel>> get memoriesStream => _memoriesCtrl.stream;
+  Stream<Map<String, MemoryIndexModel>> get memoryIndexStream =>
+      _memoryIndexCtrl.stream;
 
   UserProfileModel get currentProfile => _readProfile();
   List<ApiKeyModel> get currentApiKeys => _readApiKeys();
@@ -50,6 +60,8 @@ class DatabaseService {
   String get currentPreferredModel => _readPreferredModel();
   String? get currentPexelsApiKey => _readPexelsApiKey();
   List<ChatSessionModel> get currentChatSessions => _readChatSessions();
+  List<MemoryItemModel> get currentMemories => _readMemories();
+  Map<String, MemoryIndexModel> get currentMemoryIndex => _readMemoryIndex();
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -59,6 +71,8 @@ class DatabaseService {
     svc._spaces = await Hive.openBox(_boxSpaces);
     svc._students = await Hive.openBox(_boxStudents);
     svc._chatSessions = await Hive.openBox(_boxChatSessions);
+    svc._memories = await Hive.openBox(_boxMemories);
+    svc._memoryIndex = await Hive.openBox(_boxMemoryIndex);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -82,6 +96,8 @@ class DatabaseService {
     svc._spaces.watch().listen((_) => svc._emitSpaces());
     svc._students.watch().listen((_) => svc._emitStudents());
     svc._chatSessions.watch().listen((_) => svc._emitChatSessions());
+    svc._memories.watch().listen((_) => svc._emitMemories());
+    svc._memoryIndex.watch().listen((_) => svc._emitMemoryIndex());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -223,6 +239,29 @@ class DatabaseService {
     _emitStudents();
   }
 
+  // Memories operations
+  Future<void> upsertMemory(MemoryItemModel memory) async {
+    await _memories.put(memory.id, memory.toJson());
+    _emitMemories();
+  }
+
+  Future<void> deleteMemory(String id) async {
+    await _memories.delete(id);
+    _emitMemories();
+  }
+
+  // Memory index per session
+  Future<void> upsertMemoryIndex(MemoryIndexModel idx) async {
+    await _memoryIndex.put(idx.sessionId, idx.toJson());
+    _emitMemoryIndex();
+  }
+
+  MemoryIndexModel? getMemoryIndex(String sessionId) {
+    final json = _memoryIndex.get(sessionId) as Map?;
+    if (json == null) return null;
+    return MemoryIndexModel.fromJson(json.cast<String, dynamic>());
+  }
+
   List<StudentModel> queryStudentsByNamePrefix(
     String prefix, {
     int limit = 10,
@@ -334,6 +373,26 @@ class DatabaseService {
     return items;
   }
 
+  List<MemoryItemModel> _readMemories() {
+    final items = <MemoryItemModel>[];
+    for (final k in _memories.keys) {
+      final json = (_memories.get(k) as Map).cast<String, dynamic>();
+      items.add(MemoryItemModel.fromJson(json));
+    }
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  }
+
+  Map<String, MemoryIndexModel> _readMemoryIndex() {
+    final map = <String, MemoryIndexModel>{};
+    for (final k in _memoryIndex.keys) {
+      final json = (_memoryIndex.get(k) as Map).cast<String, dynamic>();
+      final m = MemoryIndexModel.fromJson(json);
+      map[m.sessionId] = m;
+    }
+    return map;
+  }
+
   void _emitAll() {
     _emitProfile();
     _emitApiKeys();
@@ -353,6 +412,8 @@ class DatabaseService {
     /* no external stream yet */
   }
   void _emitChatSessions() => _chatSessionsCtrl.add(_readChatSessions());
+  void _emitMemories() => _memoriesCtrl.add(_readMemories());
+  void _emitMemoryIndex() => _memoryIndexCtrl.add(_readMemoryIndex());
 
   /// Danger zone: wipes all persisted app data and re-seeds minimal defaults.
   /// This clears profile, API keys, spaces, students, and chat sessions.
@@ -364,6 +425,8 @@ class DatabaseService {
       _spaces.clear(),
       _students.clear(),
       _chatSessions.clear(),
+      _memories.clear(),
+      _memoryIndex.clear(),
     ]);
 
     // Re-seed minimal defaults expected by the UI
@@ -376,5 +439,7 @@ class DatabaseService {
 
     _emitAll();
     _emitChatSessions();
+    _emitMemories();
+    _emitMemoryIndex();
   }
 }

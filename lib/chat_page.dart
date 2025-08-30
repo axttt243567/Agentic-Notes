@@ -5,6 +5,7 @@ import 'data/models.dart';
 import 'chat_history_page.dart';
 // DB access via DBProvider in main.dart
 import 'dart:async';
+import 'data/llm_memory_analyzer.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, this.title, this.sessionId, this.spaceId});
@@ -421,6 +422,13 @@ extension _SaveSession on _ChatPageState {
       messages: msgs,
     );
     await db.upsertChatSession(session);
+    // Fire-and-forget LLM memory analysis to build summary/hashtags/sections
+    // ignore: discarded_futures
+    LlmMemoryAnalyzer(db).analyzeSession(session).then((idx) async {
+      if (idx != null) {
+        await db.upsertMemoryIndex(idx);
+      }
+    });
     _sessionId = id;
     _createdAt = created;
     _titleOverride = title;
