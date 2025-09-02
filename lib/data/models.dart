@@ -591,3 +591,110 @@ class MemoryIndexModel {
             .toList(),
       );
 }
+
+@immutable
+class ScheduleModel {
+  final String id; // unique
+  final String title; // e.g., Subject name
+  final String emoji; // visual marker
+  final String? spaceId; // optional link to a space
+  final List<int> daysOfWeek; // 1=Mon ... 7=Sun
+  final String? timeOfDay; // HH:mm (24h)
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const ScheduleModel({
+    required this.id,
+    required this.title,
+    required this.emoji,
+    this.spaceId,
+    required this.daysOfWeek,
+    this.timeOfDay,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  ScheduleModel copyWith({
+    String? id,
+    String? title,
+    String? emoji,
+    String? spaceId,
+    List<int>? daysOfWeek,
+    String? timeOfDay,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => ScheduleModel(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    emoji: emoji ?? this.emoji,
+    spaceId: spaceId ?? this.spaceId,
+    daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+    timeOfDay: timeOfDay ?? this.timeOfDay,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'emoji': emoji,
+    if (spaceId != null) 'spaceId': spaceId,
+    'daysOfWeek': daysOfWeek,
+    if (timeOfDay != null) 'timeOfDay': timeOfDay,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory ScheduleModel.fromJson(Map<String, dynamic> json) => ScheduleModel(
+    id: json['id'] as String,
+    title: json['title'] as String? ?? '',
+    emoji: json['emoji'] as String? ?? '📘',
+    spaceId: json['spaceId'] as String?,
+    daysOfWeek: ((json['daysOfWeek'] as List?) ?? const [])
+        .map((e) => (e as num).toInt())
+        .toList(growable: false),
+    timeOfDay: json['timeOfDay'] as String?,
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+    updatedAt:
+        DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+  );
+}
+
+@immutable
+class AttendanceEntryModel {
+  final String id; // unique: scheduleId|yyyy-MM-dd
+  final String scheduleId;
+  final String date; // yyyy-MM-dd
+  final bool present; // true=Present, false=Absent
+  final DateTime ts; // when marked
+
+  const AttendanceEntryModel({
+    required this.id,
+    required this.scheduleId,
+    required this.date,
+    required this.present,
+    required this.ts,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'scheduleId': scheduleId,
+    'date': date,
+    'present': present,
+    'ts': ts.toIso8601String(),
+  };
+
+  factory AttendanceEntryModel.fromJson(Map<String, dynamic> json) =>
+      AttendanceEntryModel(
+        id: json['id'] as String,
+        scheduleId: json['scheduleId'] as String,
+        date: json['date'] as String,
+        present: (json['present'] as bool?) ?? false,
+        ts:
+            DateTime.tryParse(json['ts'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}

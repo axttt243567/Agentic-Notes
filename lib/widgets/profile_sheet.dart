@@ -3,7 +3,6 @@ import 'add_api_key_sheet.dart';
 import 'dart:async';
 import '../main.dart';
 import '../data/models.dart';
-import '../recommended_spaces_page.dart';
 import '../onboarding.dart';
 import '../profile_page.dart';
 
@@ -77,446 +76,76 @@ class _ProfileSheetState extends State<ProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.of(context).viewInsets;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(bottom: viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.8,
-        minChildSize: 0.6,
-        maxChildSize: 0.95,
-        builder: (context, controller) {
-          return Material(
-            color: theme.colorScheme.surface,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: CustomScrollView(
-              controller: controller,
-              slivers: [
-                SliverToBoxAdapter(child: _grabber()),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  sliver: SliverList.list(
-                    children: [
-                      Text(
-                        'Profile',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // View profile option
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF2F3336)),
-                        ),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.person_outline,
-                            color: Color(0xFF71767B),
-                          ),
-                          title: const Text('View profile'),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ProfilePage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _section(
-                        context,
-                        title: 'API Keys',
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: const Color(0xFF2F3336),
-                                  ),
-                                ),
-                                child: Text(
-                                  '${_keys.length} key${_keys.length == 1 ? '' : 's'}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF71767B),
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                              InputChip(
-                                label: const Text('+ add'),
-                                onPressed: _addApiKey,
-                                shape: const StadiumBorder(),
-                                backgroundColor: Colors.transparent,
-                                side: const BorderSide(
-                                  color: Color(0xFF2F3336),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (_keys.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.vpn_key_outlined,
-                                    color: Color(0xFF71767B),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Expanded(
-                                    child: Text(
-                                      'No API keys yet',
-                                      style: TextStyle(
-                                        color: Color(0xFF71767B),
-                                      ),
-                                    ),
-                                  ),
-                                  InputChip(
-                                    label: const Text('+ add'),
-                                    onPressed: _addApiKey,
-                                    shape: const StadiumBorder(),
-                                    backgroundColor: Colors.transparent,
-                                    side: const BorderSide(
-                                      color: Color(0xFF2F3336),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFF2F3336),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  for (int i = 0; i < _keys.length; i++) ...[
-                                    _minimalKeyTile(
-                                      keyData: _keys[i],
-                                      onManage: () => _manageKey(_keys[i], i),
-                                    ),
-                                    if (i < _keys.length - 1)
-                                      const Divider(
-                                        height: 1,
-                                        thickness: 1,
-                                        color: Color(0xFF2F3336),
-                                        indent: 48,
-                                      ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _section(
-                        context,
-                        title: 'Spaces',
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: const Color(0xFF2F3336),
-                                  ),
-                                ),
-                                child: Text(
-                                  '${_spaces.length} space${_spaces.length == 1 ? '' : 's'}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF71767B),
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                              InputChip(
-                                label: const Text('+ new'),
-                                onPressed: _createSpace,
-                                shape: const StadiumBorder(),
-                                backgroundColor: Colors.transparent,
-                                side: const BorderSide(
-                                  color: Color(0xFF2F3336),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          // Recommended spaces entry
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF2F3336),
-                              ),
-                            ),
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.recommend_outlined,
-                                color: Color(0xFF71767B),
-                              ),
-                              title: const Text('Recommended spaces'),
-                              subtitle: const Text(
-                                'Curated picks for research and study',
-                              ),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () async {
-                                final result = await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const RecommendedSpacesPage(),
-                                  ),
-                                );
-                                // Optionally show a toast if spaces were added
-                                if (!mounted) return;
-                                if (result == 'added') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Space added'),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (_spaces.isEmpty)
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final s in const [
-                                  ['💻', 'Programming'],
-                                  ['🧪', 'Chemistry'],
-                                  ['🧮', 'Math'],
-                                  ['🪐', 'Physics'],
-                                  ['🧬', 'Biology'],
-                                  ['🌍', 'Geography'],
-                                ])
-                                  InputChip(
-                                    label: Text('${s[0]} ${s[1]}'),
-                                    onPressed: () =>
-                                        _quickCreateSpace(s[0], s[1]),
-                                    shape: const StadiumBorder(),
-                                    backgroundColor: Colors.transparent,
-                                    side: const BorderSide(
-                                      color: Color(0xFF2F3336),
-                                    ),
-                                  ),
-                              ],
-                            )
-                          else
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final sp in _spaces)
-                                  InputChip(
-                                    label: Text('${sp.emoji} ${sp.name}'),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Open spaces from Home. Profile shows list only.',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    shape: const StadiumBorder(),
-                                    backgroundColor: Colors.transparent,
-                                    side: const BorderSide(
-                                      color: Color(0xFF2F3336),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _section(
-                        context,
-                        title: 'Pexels API key',
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF2F3336),
-                              ),
-                            ),
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.image_outlined,
-                                color: Color(0xFF71767B),
-                              ),
-                              title: Text(
-                                _pexelsKey == null || _pexelsKey!.isEmpty
-                                    ? 'Not configured'
-                                    : 'Configured',
-                              ),
-                              subtitle: Text(
-                                _pexelsKey == null || _pexelsKey!.isEmpty
-                                    ? 'Add a Pexels API key to load images for banners and gallery.'
-                                    : 'Used for loading banner and gallery images from Pexels.',
-                                style: const TextStyle(
-                                  color: Color(0xFF71767B),
-                                ),
-                              ),
-                              trailing: InputChip(
-                                label: const Text('manage'),
-                                avatar: const Icon(
-                                  Icons.settings_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: _managePexelsKey,
-                                shape: const StadiumBorder(),
-                                backgroundColor: Colors.transparent,
-                                side: const BorderSide(
-                                  color: Color(0xFF2F3336),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _section(
-                        context,
-                        title: 'About us',
-                        children: [_aboutCard()],
-                      ),
-                      const SizedBox(height: 16),
-                      _section(
-                        context,
-                        title: 'Suggestions',
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.settings_outlined),
-                            title: const Text('Manage suggestions'),
-                            subtitle: const Text('Opens suggestions settings'),
-                            onTap: () {
-                              // Close profile and signal to open settings on Home
-                              Navigator.of(context).pop('open_suggestions');
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _section(
-                        context,
-                        title: 'Danger zone',
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF2F3336),
-                              ),
-                            ),
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.delete_forever_outlined,
-                                color: Colors.redAccent,
-                              ),
-                              title: const Text(
-                                'Delete all data',
-                                style: TextStyle(color: Color(0xFFE7E9EA)),
-                              ),
-                              subtitle: const Text(
-                                'Clears API keys, chats, spaces, students, and profile',
-                                style: TextStyle(color: Color(0xFF71767B)),
-                              ),
-                              onTap: _confirmAndWipeAll,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2F3336),
+                  borderRadius: BorderRadius.circular(999),
                 ),
-              ],
+              ),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _grabber() => Center(
-    child: Container(
-      width: 40,
-      height: 4,
-      margin: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2F3336),
-        borderRadius: BorderRadius.circular(999),
-      ),
-    ),
-  );
-
-  Widget _section(
-    BuildContext context, {
-    required String title,
-    required List<Widget> children,
-  }) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF71767B),
-          ),
+            // View profile
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2F3336)),
+              ),
+              child: ListTile(
+                leading: const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFF71767B),
+                ),
+                title: const Text('View your profile'),
+                subtitle: const Text('See your profile details'),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  nav.push(
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Internal setting
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2F3336)),
+              ),
+              child: ListTile(
+                leading: const Icon(
+                  Icons.tune_outlined,
+                  color: Color(0xFF71767B),
+                ),
+                title: const Text('Internal setting'),
+                subtitle: const Text('Advanced controls and data'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openInternalSettings,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // About us
+            _aboutCard(),
+          ],
         ),
-        const SizedBox(height: 10),
-        ...children,
-      ],
+      ),
     );
   }
 
-  void _addApiKey() async {
+  Future<void> _addApiKey() async {
     final db = DBProvider.of(context);
     final res = await showModalBottomSheet<ApiKeyData>(
       context: context,
@@ -562,7 +191,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     );
   }
 
-  void _manageKey(ApiKeyModel key, int index) async {
+  Future<void> _manageKey(ApiKeyModel key, int index) async {
     final db = DBProvider.of(context);
     await showModalBottomSheet<void>(
       context: context,
@@ -668,6 +297,28 @@ class _ProfileSheetState extends State<ProfileSheet> {
     );
   }
 
+  Widget _section(
+    BuildContext ctx, {
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+          child: Text(
+            title,
+            style: Theme.of(
+              ctx,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        ...children,
+      ],
+    );
+  }
+
   Future<bool?> _confirm(BuildContext context, String message) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -689,27 +340,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     return ok;
   }
 
-  Future<void> _createSpace() async {
-    final res = await showModalBottomSheet<_SpaceQuickCreateResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => const _CreateSpaceSheet(),
-    );
-    if (res == null || !mounted) return;
-    final db = DBProvider.of(context);
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    await db.upsertSpace(SpaceModel(id: id, name: res.name, emoji: res.emoji));
-  }
-
-  void _quickCreateSpace(String emoji, String name) {
-    final db = DBProvider.of(context);
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    db.upsertSpace(SpaceModel(id: id, name: name, emoji: emoji));
-  }
+  // Spaces quick-create moved into Internal setting; helpers removed from main sheet
 
   Future<void> _confirmAndWipeAll() async {
     final ok = await _confirm(
@@ -729,7 +360,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     );
   }
 
-  void _managePexelsKey() async {
+  Future<void> _managePexelsKey() async {
     final controller = TextEditingController(text: _pexelsKey ?? '');
     final db = DBProvider.of(context);
     await showModalBottomSheet<void>(
@@ -804,6 +435,459 @@ class _ProfileSheetState extends State<ProfileSheet> {
                   ],
                 ),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openInternalSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final insets = MediaQuery.of(ctx).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(bottom: insets.bottom),
+          child: StatefulBuilder(
+            builder: (ctx, setStfState) => SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2F3336),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Internal setting',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // API entry card -> opens API settings sheet
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2F3336)),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.api_outlined,
+                        color: Color(0xFF71767B),
+                      ),
+                      title: const Text('API'),
+                      subtitle: const Text(
+                        'Manage main API keys and Pexels API key',
+                        style: TextStyle(color: Color(0xFF71767B)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _openApiSettings,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Spaces
+                  _section(
+                    ctx,
+                    title: 'Spaces',
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
+                            ),
+                            child: Text(
+                              '${_spaces.length} space${_spaces.length == 1 ? '' : 's'}',
+                              style: const TextStyle(color: Color(0xFF71767B)),
+                            ),
+                          ),
+                          const Spacer(),
+                          InputChip(
+                            label: const Text('+ new'),
+                            onPressed: () async {
+                              final res =
+                                  await showModalBottomSheet<
+                                    _SpaceQuickCreateResult
+                                  >(
+                                    context: ctx,
+                                    isScrollControlled: true,
+                                    backgroundColor: Theme.of(
+                                      ctx,
+                                    ).colorScheme.surface,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20),
+                                      ),
+                                    ),
+                                    builder: (c) => const _CreateSpaceSheet(),
+                                  );
+                              if (res != null && mounted) {
+                                final db = DBProvider.of(context);
+                                final id = DateTime.now().millisecondsSinceEpoch
+                                    .toString();
+                                await db.upsertSpace(
+                                  SpaceModel(
+                                    id: id,
+                                    name: res.name,
+                                    emoji: res.emoji,
+                                  ),
+                                );
+                                if (ctx.mounted) setStfState(() {});
+                              }
+                            },
+                            shape: const StadiumBorder(),
+                            backgroundColor: Colors.transparent,
+                            side: const BorderSide(color: Color(0xFF2F3336)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_spaces.isEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final s in const [
+                              ['💻', 'Programming'],
+                              ['🧪', 'Chemistry'],
+                              ['🧮', 'Math'],
+                              ['🪐', 'Physics'],
+                              ['🧬', 'Biology'],
+                              ['🌍', 'Geography'],
+                            ])
+                              InputChip(
+                                label: Text('${s[0]} ${s[1]}'),
+                                onPressed: () async {
+                                  final db = DBProvider.of(context);
+                                  final id = DateTime.now()
+                                      .millisecondsSinceEpoch
+                                      .toString();
+                                  await db.upsertSpace(
+                                    SpaceModel(id: id, name: s[1], emoji: s[0]),
+                                  );
+                                  if (ctx.mounted) setStfState(() {});
+                                },
+                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.transparent,
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
+                              ),
+                          ],
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final sp in _spaces)
+                              InputChip(
+                                label: Text('${sp.emoji} ${sp.name}'),
+                                onPressed: () {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Open spaces from Home. Profile shows list only.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.transparent,
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Suggestions
+                  _section(
+                    ctx,
+                    title: 'Suggestions',
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.settings_outlined),
+                        title: const Text('Manage suggestions'),
+                        subtitle: const Text('Opens suggestions settings'),
+                        onTap: () {
+                          Navigator.of(ctx).maybePop();
+                          // Close profile and signal to open settings on Home
+                          Navigator.of(context).pop('open_suggestions');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Danger zone
+                  _section(
+                    ctx,
+                    title: 'Danger zone',
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2F3336)),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.delete_forever_outlined,
+                            color: Colors.redAccent,
+                          ),
+                          title: const Text(
+                            'Delete all data',
+                            style: TextStyle(color: Color(0xFFE7E9EA)),
+                          ),
+                          subtitle: const Text(
+                            'Clears API keys, chats, spaces, students, and profile',
+                            style: TextStyle(color: Color(0xFF71767B)),
+                          ),
+                          onTap: () async {
+                            Navigator.of(ctx).maybePop();
+                            await _confirmAndWipeAll();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openApiSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final insets = MediaQuery.of(ctx).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(bottom: insets.bottom),
+          child: StatefulBuilder(
+            builder: (ctx, setStfState) => SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2F3336),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'API settings',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Main API Keys
+                  _section(
+                    ctx,
+                    title: 'Main API keys',
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
+                            ),
+                            child: Text(
+                              '${_keys.length} key${_keys.length == 1 ? '' : 's'}',
+                              style: const TextStyle(color: Color(0xFF71767B)),
+                            ),
+                          ),
+                          const Spacer(),
+                          InputChip(
+                            label: const Text('+ add'),
+                            onPressed: () async {
+                              await _addApiKey();
+                              if (ctx.mounted) setStfState(() {});
+                            },
+                            shape: const StadiumBorder(),
+                            backgroundColor: Colors.transparent,
+                            side: const BorderSide(color: Color(0xFF2F3336)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_keys.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.vpn_key_outlined,
+                                color: Color(0xFF71767B),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'No API keys yet',
+                                  style: TextStyle(color: Color(0xFF71767B)),
+                                ),
+                              ),
+                              InputChip(
+                                label: const Text('+ add'),
+                                onPressed: () async {
+                                  await _addApiKey();
+                                  if (ctx.mounted) setStfState(() {});
+                                },
+                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.transparent,
+                                side: const BorderSide(
+                                  color: Color(0xFF2F3336),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2F3336)),
+                          ),
+                          child: Column(
+                            children: [
+                              for (int i = 0; i < _keys.length; i++) ...[
+                                _minimalKeyTile(
+                                  keyData: _keys[i],
+                                  onManage: () async {
+                                    await _manageKey(_keys[i], i);
+                                    if (ctx.mounted) setStfState(() {});
+                                  },
+                                ),
+                                if (i < _keys.length - 1)
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: Color(0xFF2F3336),
+                                    indent: 48,
+                                  ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Pexels API key
+                  _section(
+                    ctx,
+                    title: 'Pexels API key',
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2F3336)),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.image_outlined,
+                            color: Color(0xFF71767B),
+                          ),
+                          title: Text(
+                            _pexelsKey == null || _pexelsKey!.isEmpty
+                                ? 'Not configured'
+                                : 'Configured',
+                          ),
+                          subtitle: const Text(
+                            'Used for loading banner and gallery images.',
+                            style: TextStyle(color: Color(0xFF71767B)),
+                          ),
+                          trailing: InputChip(
+                            label: const Text('manage'),
+                            avatar: const Icon(
+                              Icons.settings_outlined,
+                              size: 18,
+                            ),
+                            onPressed: () async {
+                              await _managePexelsKey();
+                              if (ctx.mounted) setStfState(() {});
+                            },
+                            shape: const StadiumBorder(),
+                            backgroundColor: Colors.transparent,
+                            side: const BorderSide(color: Color(0xFF2F3336)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

@@ -12,6 +12,8 @@ class DatabaseService {
   static const _boxChatSessions = 'chat_sessions_box';
   static const _boxMemories = 'memories_box';
   static const _boxMemoryIndex = 'memory_index_box';
+  static const _boxSchedules = 'schedules_box';
+  static const _boxAttendance = 'attendance_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -25,6 +27,8 @@ class DatabaseService {
   late final Box _chatSessions;
   late final Box _memories;
   late final Box _memoryIndex;
+  late final Box _schedules;
+  late final Box _attendance;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -38,6 +42,9 @@ class DatabaseService {
   final _memoriesCtrl = StreamController<List<MemoryItemModel>>.broadcast();
   final _memoryIndexCtrl =
       StreamController<Map<String, MemoryIndexModel>>.broadcast();
+  final _schedulesCtrl = StreamController<List<ScheduleModel>>.broadcast();
+  final _attendanceCtrl =
+      StreamController<Map<String, AttendanceEntryModel>>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
@@ -51,6 +58,9 @@ class DatabaseService {
   Stream<List<MemoryItemModel>> get memoriesStream => _memoriesCtrl.stream;
   Stream<Map<String, MemoryIndexModel>> get memoryIndexStream =>
       _memoryIndexCtrl.stream;
+  Stream<List<ScheduleModel>> get schedulesStream => _schedulesCtrl.stream;
+  Stream<Map<String, AttendanceEntryModel>> get attendanceStream =>
+      _attendanceCtrl.stream;
 
   UserProfileModel get currentProfile => _readProfile();
   List<ApiKeyModel> get currentApiKeys => _readApiKeys();
@@ -62,6 +72,8 @@ class DatabaseService {
   List<ChatSessionModel> get currentChatSessions => _readChatSessions();
   List<MemoryItemModel> get currentMemories => _readMemories();
   Map<String, MemoryIndexModel> get currentMemoryIndex => _readMemoryIndex();
+  List<ScheduleModel> get currentSchedules => _readSchedules();
+  Map<String, AttendanceEntryModel> get currentAttendance => _readAttendance();
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -73,6 +85,8 @@ class DatabaseService {
     svc._chatSessions = await Hive.openBox(_boxChatSessions);
     svc._memories = await Hive.openBox(_boxMemories);
     svc._memoryIndex = await Hive.openBox(_boxMemoryIndex);
+    svc._schedules = await Hive.openBox(_boxSchedules);
+    svc._attendance = await Hive.openBox(_boxAttendance);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -98,6 +112,8 @@ class DatabaseService {
     svc._chatSessions.watch().listen((_) => svc._emitChatSessions());
     svc._memories.watch().listen((_) => svc._emitMemories());
     svc._memoryIndex.watch().listen((_) => svc._emitMemoryIndex());
+    svc._schedules.watch().listen((_) => svc._emitSchedules());
+    svc._attendance.watch().listen((_) => svc._emitAttendance());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -121,6 +137,8 @@ class DatabaseService {
     _suggestLevelCtrl.close();
     _preferredModelCtrl.close();
     _pexelsKeyCtrl.close();
+    _schedulesCtrl.close();
+    _attendanceCtrl.close();
   }
 
   // Profile operations
@@ -262,6 +280,29 @@ class DatabaseService {
     return MemoryIndexModel.fromJson(json.cast<String, dynamic>());
   }
 
+  // Schedules operations
+  Future<void> upsertSchedule(ScheduleModel schedule) async {
+    await _schedules.put(schedule.id, schedule.toJson());
+    _emitSchedules();
+  }
+
+  Future<void> deleteSchedule(String id) async {
+    await _schedules.delete(id);
+    _emitSchedules();
+  }
+
+  // Attendance operations
+  Future<void> upsertAttendance(AttendanceEntryModel entry) async {
+    await _attendance.put(entry.id, entry.toJson());
+    _emitAttendance();
+  }
+
+  AttendanceEntryModel? getAttendanceById(String id) {
+    final json = _attendance.get(id) as Map?;
+    if (json == null) return null;
+    return AttendanceEntryModel.fromJson(json.cast<String, dynamic>());
+  }
+
   List<StudentModel> queryStudentsByNamePrefix(
     String prefix, {
     int limit = 10,
@@ -393,6 +434,26 @@ class DatabaseService {
     return map;
   }
 
+  List<ScheduleModel> _readSchedules() {
+    final items = <ScheduleModel>[];
+    for (final k in _schedules.keys) {
+      final json = (_schedules.get(k) as Map).cast<String, dynamic>();
+      items.add(ScheduleModel.fromJson(json));
+    }
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  }
+
+  Map<String, AttendanceEntryModel> _readAttendance() {
+    final map = <String, AttendanceEntryModel>{};
+    for (final k in _attendance.keys) {
+      final json = (_attendance.get(k) as Map).cast<String, dynamic>();
+      final m = AttendanceEntryModel.fromJson(json);
+      map[m.id] = m;
+    }
+    return map;
+  }
+
   void _emitAll() {
     _emitProfile();
     _emitApiKeys();
@@ -414,6 +475,8 @@ class DatabaseService {
   void _emitChatSessions() => _chatSessionsCtrl.add(_readChatSessions());
   void _emitMemories() => _memoriesCtrl.add(_readMemories());
   void _emitMemoryIndex() => _memoryIndexCtrl.add(_readMemoryIndex());
+  void _emitSchedules() => _schedulesCtrl.add(_readSchedules());
+  void _emitAttendance() => _attendanceCtrl.add(_readAttendance());
 
   /// Danger zone: wipes all persisted app data and re-seeds minimal defaults.
   /// This clears profile, API keys, spaces, students, and chat sessions.
@@ -427,6 +490,8 @@ class DatabaseService {
       _chatSessions.clear(),
       _memories.clear(),
       _memoryIndex.clear(),
+      _schedules.clear(),
+      _attendance.clear(),
     ]);
 
     // Re-seed minimal defaults expected by the UI
@@ -441,5 +506,7 @@ class DatabaseService {
     _emitChatSessions();
     _emitMemories();
     _emitMemoryIndex();
+    _emitSchedules();
+    _emitAttendance();
   }
 }

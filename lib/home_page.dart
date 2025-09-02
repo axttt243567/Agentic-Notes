@@ -7,6 +7,7 @@ import 'create_space_with_ai_page.dart';
 import 'data/models.dart';
 import 'dart:async';
 import 'chat_history_page.dart';
+import 'calendar_page.dart';
 
 /// Home page: minimal shell with a profile button.
 class HomePage extends StatefulWidget {
@@ -21,12 +22,32 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription? _spacesSub;
   String _suggestLevel = 'balanced';
   StreamSubscription? _suggestSub;
+  final List<ScheduleModel> _schedules = [];
+  StreamSubscription? _schedSub;
+  // Removed attendance persistence per simplified design
+
+  late DateTime _weekAnchor; // Monday of the shown week
+  late DateTime _selectedDate; // selected day within the week
+  final Map<String, Set<String>> _localDone = {}; // dateKey -> scheduleIds
+
+  // Pager for week-to-week horizontal scrolling of day chips
+  late PageController _weekPageController;
+  static const int _weekPageCenter = 5000;
+  late DateTime _weekBaseAnchor; // anchor for the center page
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with a temporary controller; real base anchor is set in didChangeDependencies
+    _weekPageController = PageController(initialPage: _weekPageCenter);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _spacesSub?.cancel();
     _suggestSub?.cancel();
+    _schedSub?.cancel();
     final db = DBProvider.of(context);
     _spaces
       ..clear()
@@ -44,159 +65,49 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() => _suggestLevel = level);
     });
+    _schedules
+      ..clear()
+      ..addAll(db.currentSchedules);
+    _schedSub = db.schedulesStream.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _schedules
+          ..clear()
+          ..addAll(list);
+      });
+    });
+    final now = DateTime.now();
+    _weekAnchor = _startOfWeek(now);
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    // Set base anchor for paging once we have DB/context
+    _weekBaseAnchor = _weekAnchor;
   }
 
-  void _openProfile() async {
-    final res = await showModalBottomSheet<dynamic>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => const ProfileSheet(),
-    );
-    if (!mounted) return;
-    if (res == 'open_suggestions') {
-      _openSuggestionSettings();
-    }
-  }
-
-  void _openChat() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const ChatPage()));
-  }
-
-  Future<void> _openSuggestionSettings() async {
-    final db = DBProvider.of(context);
-    String selected = _suggestLevel;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: StatefulBuilder(
-            builder: (context, setStateSB) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2F3336),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                Text(
-                  'Manage suggestions',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                const Text('How many suggestions?'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('Suggest less'),
-                      selected: selected == 'less',
-                      onSelected: (_) async {
-                        setStateSB(() => selected = 'less');
-                        await db.setSuggestLevel('less');
-                      },
-                    ),
-                    ChoiceChip(
-                      label: const Text('Balanced'),
-                      selected: selected == 'balanced',
-                      onSelected: (_) async {
-                        setStateSB(() => selected = 'balanced');
-                        await db.setSuggestLevel('balanced');
-                      },
-                    ),
-                    ChoiceChip(
-                      label: const Text('Suggest more'),
-                      selected: selected == 'more',
-                      onSelected: (_) async {
-                        setStateSB(() => selected = 'more');
-                        await db.setSuggestLevel('more');
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(ctx).maybePop(),
-                    child: const Text('Close'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _addSpace() async {
-    final db = DBProvider.of(context);
-    final created = await showModalBottomSheet<SpaceModel>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => const _AddSpaceSheet(),
-    );
-    if (created == null) return;
-    await db.upsertSpace(created);
-  }
-
-  void _quickCreateSpace(String emoji, String name) {
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final db = DBProvider.of(context);
-    db.upsertSpace(SpaceModel(id: id, name: name, emoji: emoji));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Created $name')));
+  @override
+  void dispose() {
+    _spacesSub?.cancel();
+    _suggestSub?.cancel();
+    _schedSub?.cancel();
+    _weekPageController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Spaces',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        title: const Text('Agentic Notes'),
         actions: [
           IconButton(
-            tooltip: 'AI chat',
-            onPressed: _openChat,
-            icon: const Icon(Icons.auto_awesome),
-          ),
-          IconButton(
-            tooltip: 'Chat history',
+            tooltip: 'Calendar',
             onPressed: () => Navigator.of(
               context,
-            ).push(MaterialPageRoute(builder: (_) => const ChatHistoryPage())),
+            ).push(MaterialPageRoute(builder: (_) => const CalendarPage())),
+            icon: const Icon(Icons.calendar_today),
+          ),
+          IconButton(
+            tooltip: 'Chat',
+            onPressed: _openChat,
             icon: const Icon(Icons.history),
           ),
           IconButton(
@@ -207,19 +118,25 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: _spaces.isEmpty
-          ? SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(12, 24, 12, 24),
-              child: Center(
-                child: _EmptyState(
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              children: [
+                _smartSuggestionsSection(context),
+                const SizedBox(height: 12),
+                _timelineSection(context),
+                const SizedBox(height: 12),
+                _EmptyState(
                   onCreate: _addSpace,
                   onQuickCreate: _quickCreateSpace,
                 ),
-              ),
+              ],
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               children: [
                 _smartSuggestionsSection(context),
+                const SizedBox(height: 12),
+                _timelineSection(context),
                 const SizedBox(height: 12),
                 Text(
                   'Your spaces',
@@ -267,6 +184,293 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
     );
+  }
+
+  Widget _timelineSection(BuildContext context) {
+    // Week days (Mon..Sun) based on anchor
+    final days = List.generate(7, (i) => _weekAnchor.add(Duration(days: i)));
+    // Clamp selected date to the currently shown week
+    if (_selectedDate.isBefore(days.first) ||
+        _selectedDate.isAfter(days.last)) {
+      _selectedDate = days.first;
+    }
+
+    final headerText = _isSameDate(_selectedDate, DateTime.now())
+        ? "Your today's schedule"
+        : "Your schedule for ${_formatPretty(_selectedDate)}";
+
+    final dow = _selectedDate.weekday; // 1..7
+    final dayItems =
+        _schedules.where((s) => s.daysOfWeek.contains(dow)).toList()
+          ..sort((a, b) => (a.timeOfDay ?? '').compareTo(b.timeOfDay ?? ''));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2F3336)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.schedule, size: 18, color: Color(0xFF71767B)),
+                const SizedBox(width: 6),
+                Text(
+                  headerText,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 40,
+              child: PageView.builder(
+                controller: _weekPageController,
+                onPageChanged: (idx) {
+                  final newAnchor = _weekBaseAnchor.add(
+                    Duration(days: 7 * (idx - _weekPageCenter)),
+                  );
+                  setState(() {
+                    _weekAnchor = newAnchor;
+                    // Clamp selected date handled below via days-first/last
+                  });
+                },
+                itemBuilder: (context, pageIdx) {
+                  final pageAnchor = _weekBaseAnchor.add(
+                    Duration(days: 7 * (pageIdx - _weekPageCenter)),
+                  );
+                  final pageDays = List.generate(
+                    7,
+                    (i) => pageAnchor.add(Duration(days: i)),
+                  );
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, i) {
+                      final d = pageDays[i];
+                      final isSel = _isSameDate(d, _selectedDate);
+                      final dayName = _weekdayLabel(d.weekday).toLowerCase();
+                      return ChoiceChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${d.day}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(dayName, style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: const VisualDensity(
+                          horizontal: -4,
+                          vertical: -4,
+                        ),
+                        selected: isSel,
+                        onSelected: (_) => setState(() => _selectedDate = d),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemCount: 7,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (dayItems.isEmpty)
+              const Text(
+                'No schedules for this day. Add a subject or routine.',
+                style: TextStyle(color: Color(0xFF71767B)),
+              )
+            else
+              ListView.separated(
+                itemCount: dayItems.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFF2F3336),
+                  indent: 48,
+                ),
+                itemBuilder: (context, i) {
+                  final sc = dayItems[i];
+                  final dateKey = _formatYMD(_selectedDate);
+                  final doneSet = _localDone.putIfAbsent(
+                    dateKey,
+                    () => <String>{},
+                  );
+                  final isDone = doneSet.contains(sc.id);
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0x00000000),
+                      foregroundColor: const Color(0x00000000),
+                      child: Text(
+                        sc.emoji,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                    ),
+                    title: Text(
+                      sc.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: Text(
+                      [
+                        sc.timeOfDay ?? 'Anytime',
+                        if (sc.spaceId != null)
+                          () {
+                            final match = _spaces.firstWhere(
+                              (s) => s.id == sc.spaceId,
+                              orElse: () =>
+                                  SpaceModel(id: '', name: '', emoji: ''),
+                            );
+                            return match.id.isEmpty ? null : '· ${match.name}';
+                          }(),
+                      ].whereType<String>().join(' '),
+                      style: const TextStyle(
+                        color: Color(0xFF71767B),
+                        fontSize: 12,
+                      ),
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Done',
+                      onPressed: () => setState(() {
+                        if (isDone) {
+                          doneSet.remove(sc.id);
+                        } else {
+                          doneSet.add(sc.id);
+                        }
+                      }),
+                      icon: Icon(
+                        Icons.check_circle_rounded,
+                        color: isDone
+                            ? const Color(0xFF00BA7C)
+                            : const Color(0xFF71767B),
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // App bar actions & space creation
+  void _openChat() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ChatHistoryPage()));
+  }
+
+  void _openProfile() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const ProfileSheet(),
+    );
+  }
+
+  Future<void> _addSpace() async {
+    final created = await showModalBottomSheet<SpaceModel>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _AddSpaceSheet(),
+    );
+    if (created == null) return;
+    await DBProvider.of(context).upsertSpace(created);
+  }
+
+  Future<void> _quickCreateSpace(String emoji, String name) async {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final model = SpaceModel(id: id, name: name, emoji: emoji);
+    await DBProvider.of(context).upsertSpace(model);
+  }
+
+  // Helpers for weekly timeline
+  DateTime _startOfWeek(DateTime d) {
+    final base = DateTime(d.year, d.month, d.day);
+    return base.subtract(Duration(days: base.weekday - 1));
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  // Removed attendance-based progress computation per request (no persistence for now)
+
+  String _formatPretty(DateTime d) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${_weekdayLabel(d.weekday)}, ${months[d.month - 1]} ${d.day}';
+  }
+
+  String _weekdayLabel(int d) {
+    switch (d) {
+      case 1:
+        return 'Mon';
+      case 2:
+        return 'Tue';
+      case 3:
+        return 'Wed';
+      case 4:
+        return 'Thu';
+      case 5:
+        return 'Fri';
+      case 6:
+        return 'Sat';
+      case 7:
+        return 'Sun';
+      default:
+        return d.toString();
+    }
+  }
+
+  // Removed attendance summary per request (no historical progress display)
+
+  // Removed: add-schedule entry from header per new design
+
+  // Removed persistence of per-item progress; Done state is kept only in-memory for UI.
+
+  String _formatYMD(DateTime d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
   }
 
   Widget _smartSuggestionsSection(BuildContext context) {
@@ -418,6 +622,10 @@ class _HomePageState extends State<HomePage> {
     return items.take(limit).toList(growable: false);
   }
 }
+
+// Removed progress widgets per simplified design
+
+// Removed add-schedule sheet UI per new design focusing on viewing schedule only
 
 class _Suggestion {
   final IconData icon;
