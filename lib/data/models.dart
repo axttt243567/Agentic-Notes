@@ -598,6 +598,7 @@ class ScheduleModel {
   final String title; // e.g., Subject name
   final String emoji; // visual marker
   final String? spaceId; // optional link to a space
+  final String? categoryId; // optional link to a routine category
   final List<int> daysOfWeek; // 1=Mon ... 7=Sun
   final String? timeOfDay; // HH:mm (24h)
   final DateTime createdAt;
@@ -608,6 +609,7 @@ class ScheduleModel {
     required this.title,
     required this.emoji,
     this.spaceId,
+    this.categoryId,
     required this.daysOfWeek,
     this.timeOfDay,
     required this.createdAt,
@@ -619,6 +621,7 @@ class ScheduleModel {
     String? title,
     String? emoji,
     String? spaceId,
+    String? categoryId,
     List<int>? daysOfWeek,
     String? timeOfDay,
     DateTime? createdAt,
@@ -628,6 +631,7 @@ class ScheduleModel {
     title: title ?? this.title,
     emoji: emoji ?? this.emoji,
     spaceId: spaceId ?? this.spaceId,
+    categoryId: categoryId ?? this.categoryId,
     daysOfWeek: daysOfWeek ?? this.daysOfWeek,
     timeOfDay: timeOfDay ?? this.timeOfDay,
     createdAt: createdAt ?? this.createdAt,
@@ -639,6 +643,7 @@ class ScheduleModel {
     'title': title,
     'emoji': emoji,
     if (spaceId != null) 'spaceId': spaceId,
+    if (categoryId != null) 'categoryId': categoryId,
     'daysOfWeek': daysOfWeek,
     if (timeOfDay != null) 'timeOfDay': timeOfDay,
     'createdAt': createdAt.toIso8601String(),
@@ -650,6 +655,7 @@ class ScheduleModel {
     title: json['title'] as String? ?? '',
     emoji: json['emoji'] as String? ?? '📘',
     spaceId: json['spaceId'] as String?,
+    categoryId: json['categoryId'] as String?,
     daysOfWeek: ((json['daysOfWeek'] as List?) ?? const [])
         .map((e) => (e as num).toInt())
         .toList(growable: false),
@@ -661,6 +667,52 @@ class ScheduleModel {
         DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
         DateTime.fromMillisecondsSinceEpoch(0),
   );
+}
+
+@immutable
+class RoutineCategoryModel {
+  final String id; // unique
+  final String name;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const RoutineCategoryModel({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  RoutineCategoryModel copyWith({
+    String? id,
+    String? name,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RoutineCategoryModel(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory RoutineCategoryModel.fromJson(Map<String, dynamic> json) =>
+      RoutineCategoryModel(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
 }
 
 @immutable

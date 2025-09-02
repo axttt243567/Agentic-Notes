@@ -18,29 +18,47 @@ class _CalendarPageState extends State<CalendarPage>
   DateTime _anchor = DateTime.now();
   List<ScheduleModel> _schedules = const [];
   StreamSubscription? _schedSub;
+  List<RoutineCategoryModel> _categories = const [];
+  StreamSubscription? _catSub;
+  List<SpaceModel> _spaces = const [];
+  StreamSubscription? _spacesSub;
 
   @override
   void initState() {
     super.initState();
-    // Two sections only: Year and Routine
-    _tabs = TabController(length: 2, vsync: this);
+    // Three sections: Year, Weekly overview, and Routines
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _schedSub?.cancel();
+    _catSub?.cancel();
+    _spacesSub?.cancel();
     final db = DBProvider.of(context);
     _schedules = db.currentSchedules;
+    _categories = db.currentRoutineCategories;
+    _spaces = db.currentSpaces;
     _schedSub = db.schedulesStream.listen((list) {
       if (!mounted) return;
       setState(() => _schedules = list);
+    });
+    _catSub = db.routineCategoriesStream.listen((list) {
+      if (!mounted) return;
+      setState(() => _categories = list);
+    });
+    _spacesSub = db.spacesStream.listen((list) {
+      if (!mounted) return;
+      setState(() => _spaces = list);
     });
   }
 
   @override
   void dispose() {
     _schedSub?.cancel();
+    _catSub?.cancel();
+    _spacesSub?.cancel();
     _tabs.dispose();
     super.dispose();
   }
@@ -57,7 +75,8 @@ class _CalendarPageState extends State<CalendarPage>
           controller: _tabs,
           tabs: const [
             Tab(text: 'Year'),
-            Tab(text: 'Routine'),
+            Tab(text: 'Weekly overview'),
+            Tab(text: 'Routines'),
           ],
         ),
         // Removed calendar/today icon as requested
@@ -66,7 +85,12 @@ class _CalendarPageState extends State<CalendarPage>
         controller: _tabs,
         children: [
           _YearView(year: _anchor.year, schedules: _schedules),
-          _RoutineViewRedesigned(schedules: _schedules),
+          _WeeklyOverviewView(schedules: _schedules),
+          _RoutinesManagerView(
+            schedules: _schedules,
+            categories: _categories,
+            spaces: _spaces,
+          ),
         ],
       ),
     );
@@ -313,15 +337,15 @@ int _busyCount(DateTime date, List<ScheduleModel> schedules) {
   return count;
 }
 
-class _RoutineViewRedesigned extends StatefulWidget {
-  const _RoutineViewRedesigned({required this.schedules});
+class _WeeklyOverviewView extends StatefulWidget {
+  const _WeeklyOverviewView({required this.schedules});
   final List<ScheduleModel> schedules;
 
   @override
-  State<_RoutineViewRedesigned> createState() => _RoutineViewRedesignedState();
+  State<_WeeklyOverviewView> createState() => _WeeklyOverviewViewState();
 }
 
-class _RoutineViewRedesignedState extends State<_RoutineViewRedesigned> {
+class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
   late int _selectedDay; // 1..7
 
   @override
@@ -346,7 +370,7 @@ class _RoutineViewRedesignedState extends State<_RoutineViewRedesigned> {
           child: Row(
             children: [
               const Text(
-                'Routine',
+                'Weekly overview',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
@@ -501,17 +525,34 @@ class _RoutineViewRedesignedState extends State<_RoutineViewRedesigned> {
 }
 
 class _AddRoutineSheet extends StatefulWidget {
-  const _AddRoutineSheet();
+  const _AddRoutineSheet({this.initial});
+  final ScheduleModel? initial;
 
   @override
   State<_AddRoutineSheet> createState() => _AddRoutineSheetState();
 }
 
 class _AddRoutineSheetState extends State<_AddRoutineSheet> {
-  final _titleCtrl = TextEditingController();
-  final _emojiCtrl = TextEditingController(text: '📘');
-  final Set<int> _days = {1, 2, 3, 4, 5};
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _emojiCtrl;
+  late Set<int> _days;
   String? _time; // HH:mm
+  String? _selectedCategoryId;
+  String? _selectedSpaceId;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.initial;
+    _titleCtrl = TextEditingController(text: s?.title ?? '');
+    _emojiCtrl = TextEditingController(text: s?.emoji ?? '📘');
+    _days = {
+      ...(s?.daysOfWeek ?? const [1, 2, 3, 4, 5]),
+    };
+    _time = s?.timeOfDay;
+    _selectedCategoryId = s?.categoryId;
+    _selectedSpaceId = s?.spaceId;
+  }
 
   @override
   void dispose() {
@@ -522,6 +563,9 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final db = DBProvider.of(context);
+    final categories = db.currentRoutineCategories;
+    final spaces = db.currentSpaces;
     final insets = MediaQuery.of(context).viewInsets;
     return Padding(
       padding: EdgeInsets.only(bottom: insets.bottom),
@@ -579,6 +623,68 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedCategoryId,
+                    isExpanded: true,
+                    hint: const Text('Category (optional)'),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None'),
+                      ),
+                      ...categories.map(
+                        (c) => DropdownMenuItem<String?>(
+                          value: c.id,
+                          child: Text(c.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _selectedCategoryId = v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'New category',
+                  onPressed: () async {
+                    final name = await _promptText(context, 'New category');
+                    if (name == null || name.trim().isEmpty) return;
+                    final now = DateTime.now();
+                    final cat = RoutineCategoryModel(
+                      id: now.millisecondsSinceEpoch.toString(),
+                      name: name.trim(),
+                      createdAt: now,
+                      updatedAt: now,
+                    );
+                    await DBProvider.of(context).upsertRoutineCategory(cat);
+                    setState(() => _selectedCategoryId = cat.id);
+                  },
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: _selectedSpaceId,
+              isExpanded: true,
+              hint: const Text('Link to space (optional)'),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('None'),
+                ),
+                ...spaces.map(
+                  (s) => DropdownMenuItem<String?>(
+                    value: s.id,
+                    child: Text('${s.emoji} ${s.name}'),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _selectedSpaceId = v),
             ),
             const SizedBox(height: 12),
             const Text('Days of week'),
@@ -658,20 +764,325 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
     final title = _titleCtrl.text.trim();
     final emoji = _emojiCtrl.text.trim().isEmpty ? '📘' : _emojiCtrl.text;
     if (title.isEmpty || _days.isEmpty) return;
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
     final now = DateTime.now();
-    final model = ScheduleModel(
-      id: id,
-      title: title,
-      emoji: emoji,
-      spaceId: null,
-      daysOfWeek: _days.toList()..sort(),
-      timeOfDay: _time,
-      createdAt: now,
-      updatedAt: now,
-    );
+    final model =
+        (widget.initial ??
+                ScheduleModel(
+                  id: now.millisecondsSinceEpoch.toString(),
+                  title: title,
+                  emoji: emoji,
+                  spaceId: _selectedSpaceId,
+                  categoryId: _selectedCategoryId,
+                  daysOfWeek: _days.toList()..sort(),
+                  timeOfDay: _time,
+                  createdAt: now,
+                  updatedAt: now,
+                ))
+            .copyWith(
+              title: title,
+              emoji: emoji,
+              spaceId: _selectedSpaceId,
+              categoryId: _selectedCategoryId,
+              daysOfWeek: _days.toList()..sort(),
+              timeOfDay: _time,
+              updatedAt: now,
+            );
     Navigator.of(context).pop(model);
   }
+}
+
+class _RoutinesManagerView extends StatelessWidget {
+  const _RoutinesManagerView({
+    required this.schedules,
+    required this.categories,
+    required this.spaces,
+  });
+  final List<ScheduleModel> schedules;
+  final List<RoutineCategoryModel> categories;
+  final List<SpaceModel> spaces;
+
+  @override
+  Widget build(BuildContext context) {
+    final byCat = <String?, List<ScheduleModel>>{};
+    for (final s in schedules) {
+      byCat.putIfAbsent(s.categoryId, () => []).add(s);
+    }
+    final spaceMap = {for (final s in spaces) s.id: s};
+
+    final sections = <Widget>[];
+    // Categories first
+    for (final c in categories) {
+      final items = byCat[c.id] ?? const [];
+      sections.addAll([
+        _SectionHeader(
+          title: c.name,
+          actions: [
+            PopupMenuButton<String>(
+              tooltip: 'Category actions',
+              onSelected: (v) async {
+                if (v == 'rename') {
+                  final name = await _promptText(context, 'Rename category');
+                  if (name == null || name.trim().isEmpty) return;
+                  final now = DateTime.now();
+                  final updated = c.copyWith(name: name.trim(), updatedAt: now);
+                  await DBProvider.of(context).upsertRoutineCategory(updated);
+                } else if (v == 'delete') {
+                  if ((byCat[c.id] ?? const []).isNotEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Move or delete routines in this category first.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  await DBProvider.of(context).deleteRoutineCategory(c.id);
+                }
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(value: 'rename', child: Text('Rename')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
+          ],
+        ),
+        ...items.map((s) => _RoutineTile(s: s, space: spaceMap[s.spaceId])),
+        const SizedBox(height: 8),
+      ]);
+    }
+    // Uncategorized
+    final uncategorized = byCat[null] ?? const [];
+    sections.addAll([
+      if (uncategorized.isNotEmpty)
+        _SectionHeader(title: 'Uncategorized', actions: const []),
+      ...uncategorized.map(
+        (s) => _RoutineTile(s: s, space: spaceMap[s.spaceId]),
+      ),
+    ]);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          child: Row(
+            children: [
+              const Text(
+                'Routines',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () async {
+                  final name = await _promptText(context, 'New category');
+                  if (name == null || name.trim().isEmpty) return;
+                  final now = DateTime.now();
+                  final cat = RoutineCategoryModel(
+                    id: now.millisecondsSinceEpoch.toString(),
+                    name: name.trim(),
+                    createdAt: now,
+                    updatedAt: now,
+                  );
+                  await DBProvider.of(context).upsertRoutineCategory(cat);
+                },
+                child: const Text('Add category'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: () async {
+                  final created = await showModalBottomSheet<ScheduleModel>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    builder: (ctx) => const _AddRoutineSheet(),
+                  );
+                  if (created == null) return;
+                  await DBProvider.of(context).upsertSchedule(created);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add routine'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            children: sections.isEmpty
+                ? [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A0A0A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2F3336)),
+                      ),
+                      child: const Text(
+                        'No routines yet. Create one to get started.',
+                        style: TextStyle(color: Color(0xFF71767B)),
+                      ),
+                    ),
+                  ]
+                : sections,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.actions});
+  final String title;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Row(
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const Spacer(),
+          ...actions,
+        ],
+      ),
+    );
+  }
+}
+
+class _RoutineTile extends StatelessWidget {
+  const _RoutineTile({required this.s, this.space});
+  final ScheduleModel s;
+  final SpaceModel? space;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2F3336)),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFF2F3336),
+          child: Text(s.emoji, style: const TextStyle(fontSize: 16)),
+        ),
+        title: Text(
+          s.title,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          _daysAndTimeLabel(s),
+          style: const TextStyle(color: Color(0xFF71767B), fontSize: 12),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (space != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16181A),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF2F3336)),
+                ),
+                child: Text(
+                  '${space!.emoji} ${space!.name}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              tooltip: 'Routine actions',
+              onSelected: (v) async {
+                if (v == 'edit') {
+                  final updated = await showModalBottomSheet<ScheduleModel>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    builder: (_) => _AddRoutineSheet(initial: s),
+                  );
+                  if (updated != null) {
+                    await DBProvider.of(context).upsertSchedule(updated);
+                  }
+                } else if (v == 'delete') {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete routine?'),
+                      content: const Text('This will remove the routine.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).maybePop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok == true) {
+                    await DBProvider.of(context).deleteSchedule(s.id);
+                  }
+                }
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _daysAndTimeLabel(ScheduleModel s) {
+  final days = s.daysOfWeek.map(_weekdayLabel).join(', ');
+  return s.timeOfDay == null ? days : '$days · ${s.timeOfDay}';
+}
+
+Future<String?> _promptText(BuildContext context, String title) async {
+  final res = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      final ctrl = TextEditingController();
+      return AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Enter name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).maybePop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      );
+    },
+  );
+  return res;
 }
 
 String _weekdayLabel(int d) {

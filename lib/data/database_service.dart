@@ -14,6 +14,7 @@ class DatabaseService {
   static const _boxMemoryIndex = 'memory_index_box';
   static const _boxSchedules = 'schedules_box';
   static const _boxAttendance = 'attendance_box';
+  static const _boxRoutineCategories = 'routine_categories_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -29,6 +30,7 @@ class DatabaseService {
   late final Box _memoryIndex;
   late final Box _schedules;
   late final Box _attendance;
+  late final Box _routineCategories;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -45,6 +47,8 @@ class DatabaseService {
   final _schedulesCtrl = StreamController<List<ScheduleModel>>.broadcast();
   final _attendanceCtrl =
       StreamController<Map<String, AttendanceEntryModel>>.broadcast();
+  final _routineCategoriesCtrl =
+      StreamController<List<RoutineCategoryModel>>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
@@ -61,6 +65,8 @@ class DatabaseService {
   Stream<List<ScheduleModel>> get schedulesStream => _schedulesCtrl.stream;
   Stream<Map<String, AttendanceEntryModel>> get attendanceStream =>
       _attendanceCtrl.stream;
+  Stream<List<RoutineCategoryModel>> get routineCategoriesStream =>
+      _routineCategoriesCtrl.stream;
 
   UserProfileModel get currentProfile => _readProfile();
   List<ApiKeyModel> get currentApiKeys => _readApiKeys();
@@ -74,6 +80,8 @@ class DatabaseService {
   Map<String, MemoryIndexModel> get currentMemoryIndex => _readMemoryIndex();
   List<ScheduleModel> get currentSchedules => _readSchedules();
   Map<String, AttendanceEntryModel> get currentAttendance => _readAttendance();
+  List<RoutineCategoryModel> get currentRoutineCategories =>
+      _readRoutineCategories();
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -87,6 +95,7 @@ class DatabaseService {
     svc._memoryIndex = await Hive.openBox(_boxMemoryIndex);
     svc._schedules = await Hive.openBox(_boxSchedules);
     svc._attendance = await Hive.openBox(_boxAttendance);
+    svc._routineCategories = await Hive.openBox(_boxRoutineCategories);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -114,6 +123,7 @@ class DatabaseService {
     svc._memoryIndex.watch().listen((_) => svc._emitMemoryIndex());
     svc._schedules.watch().listen((_) => svc._emitSchedules());
     svc._attendance.watch().listen((_) => svc._emitAttendance());
+    svc._routineCategories.watch().listen((_) => svc._emitRoutineCategories());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -139,6 +149,7 @@ class DatabaseService {
     _pexelsKeyCtrl.close();
     _schedulesCtrl.close();
     _attendanceCtrl.close();
+    _routineCategoriesCtrl.close();
   }
 
   // Profile operations
@@ -434,6 +445,17 @@ class DatabaseService {
     return map;
   }
 
+  // Routine categories operations
+  Future<void> upsertRoutineCategory(RoutineCategoryModel category) async {
+    await _routineCategories.put(category.id, category.toJson());
+    _emitRoutineCategories();
+  }
+
+  Future<void> deleteRoutineCategory(String id) async {
+    await _routineCategories.delete(id);
+    _emitRoutineCategories();
+  }
+
   List<ScheduleModel> _readSchedules() {
     final items = <ScheduleModel>[];
     for (final k in _schedules.keys) {
@@ -452,6 +474,16 @@ class DatabaseService {
       map[m.id] = m;
     }
     return map;
+  }
+
+  List<RoutineCategoryModel> _readRoutineCategories() {
+    final items = <RoutineCategoryModel>[];
+    for (final k in _routineCategories.keys) {
+      final json = (_routineCategories.get(k) as Map).cast<String, dynamic>();
+      items.add(RoutineCategoryModel.fromJson(json));
+    }
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
   }
 
   void _emitAll() {
@@ -477,6 +509,8 @@ class DatabaseService {
   void _emitMemoryIndex() => _memoryIndexCtrl.add(_readMemoryIndex());
   void _emitSchedules() => _schedulesCtrl.add(_readSchedules());
   void _emitAttendance() => _attendanceCtrl.add(_readAttendance());
+  void _emitRoutineCategories() =>
+      _routineCategoriesCtrl.add(_readRoutineCategories());
 
   /// Danger zone: wipes all persisted app data and re-seeds minimal defaults.
   /// This clears profile, API keys, spaces, students, and chat sessions.
@@ -492,6 +526,7 @@ class DatabaseService {
       _memoryIndex.clear(),
       _schedules.clear(),
       _attendance.clear(),
+      _routineCategories.clear(),
     ]);
 
     // Re-seed minimal defaults expected by the UI
@@ -508,5 +543,6 @@ class DatabaseService {
     _emitMemoryIndex();
     _emitSchedules();
     _emitAttendance();
+    _emitRoutineCategories();
   }
 }

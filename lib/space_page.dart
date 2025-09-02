@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'chat_page.dart';
 import 'main.dart';
+import 'calendar_page.dart';
 import 'data/models.dart';
 import 'data/database_service.dart';
 import 'data/pexels_service.dart';
@@ -32,11 +33,14 @@ class _SpacePageState extends State<SpacePage>
   StreamSubscription? _pexelsSub;
   List<String> _bannerUrls = const [];
   bool _loadingBanner = false;
+  // Schedules for routines linked to this space
+  List<ScheduleModel> _schedules = const [];
+  StreamSubscription? _schedulesSub;
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: 4, vsync: this);
     _tab.addListener(() {
       if (!mounted) return;
       setState(() {});
@@ -47,6 +51,13 @@ class _SpacePageState extends State<SpacePage>
       _hydrateSpace(db);
       _pexelsKey = db.currentPexelsApiKey;
       _maybeLoadBanner();
+      // hydrate schedules for this space and subscribe to changes
+      _schedules = db.currentSchedules;
+      _schedulesSub?.cancel();
+      _schedulesSub = db.schedulesStream.listen((list) {
+        if (!mounted) return;
+        setState(() => _schedules = list);
+      });
       _spacesSub?.cancel();
       _spacesSub = db.spacesStream.listen((list) {
         if (!mounted) return;
@@ -78,6 +89,7 @@ class _SpacePageState extends State<SpacePage>
     _tab.dispose();
     _spacesSub?.cancel();
     _pexelsSub?.cancel();
+    _schedulesSub?.cancel();
     super.dispose();
   }
 
@@ -185,12 +197,13 @@ class _SpacePageState extends State<SpacePage>
           controller: _tab,
           tabs: const [
             Tab(text: 'Study'),
+            Tab(text: 'Routine'),
             Tab(text: 'Resources'),
             Tab(text: 'Gallery'),
           ],
         ),
       ),
-      floatingActionButton: _tab.index == 1
+      floatingActionButton: _tab.index == 2
           ? FloatingActionButton.extended(
               onPressed: _addResource,
               icon: const Icon(Icons.add),
@@ -210,6 +223,16 @@ class _SpacePageState extends State<SpacePage>
             onEditGuide: (text) => _saveSpace(guide: text),
             banner: _BannerImage(urls: _bannerUrls),
           ),
+          _SpaceRoutinesTab(
+            spaceId: widget.spaceId,
+            schedules: _schedules,
+            banner: _BannerImage(urls: _bannerUrls),
+            onOpenCalendar: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const CalendarPage()));
+            },
+          ),
           _ResourcesTab(
             resources: _resources,
             onDelete: (id) {
@@ -221,6 +244,133 @@ class _SpacePageState extends State<SpacePage>
             query: _space?.name ?? widget.name,
             pexelsKey: _pexelsKey,
             onTapReload: _maybeLoadBanner,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpaceRoutinesTab extends StatelessWidget {
+  const _SpaceRoutinesTab({
+    required this.spaceId,
+    required this.schedules,
+    required this.banner,
+    required this.onOpenCalendar,
+  });
+  final String spaceId;
+  final List<ScheduleModel> schedules;
+  final Widget banner;
+  final VoidCallback onOpenCalendar;
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = schedules.where((s) => s.spaceId == spaceId).toList();
+    if (linked.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          banner,
+          const SizedBox(height: 12),
+          const _SectionTitle('Routine'),
+          const SizedBox(height: 8),
+          _RoutinesEmpty(onOpenCalendar: onOpenCalendar),
+        ],
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      itemCount: linked.length + 2,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        if (i == 0) return banner;
+        if (i == 1) return const _SectionTitle('Routine');
+        final s = linked[i - 2];
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2F3336)),
+          ),
+          child: ListTile(
+            leading: Text(s.emoji, style: const TextStyle(fontSize: 22)),
+            title: Text(s.title),
+            subtitle: Text(
+              _formatDays(s.daysOfWeek) +
+                  (s.timeOfDay != null && s.timeOfDay!.isNotEmpty
+                      ? ' · ' + _formatTime(s.timeOfDay!)
+                      : ''),
+              style: const TextStyle(color: Color(0xFF71767B)),
+            ),
+            trailing: IconButton(
+              tooltip: 'Open calendar',
+              icon: const Icon(
+                Icons.calendar_today_outlined,
+                color: Color(0xFF71767B),
+              ),
+              onPressed: onOpenCalendar,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDays(List<int> days) {
+    const names = {
+      1: 'Mon',
+      2: 'Tue',
+      3: 'Wed',
+      4: 'Thu',
+      5: 'Fri',
+      6: 'Sat',
+      7: 'Sun',
+    };
+    return days.map((d) => names[d] ?? d.toString()).join(' ');
+  }
+
+  String _formatTime(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return hhmm;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    final hour12 = h % 12 == 0 ? 12 : h % 12;
+    final mm = m.toString().padLeft(2, '0');
+    return '$hour12:$mm $suffix';
+  }
+}
+
+class _RoutinesEmpty extends StatelessWidget {
+  const _RoutinesEmpty({required this.onOpenCalendar});
+  final VoidCallback onOpenCalendar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2F3336)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'No routines linked',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Link routines to this space from Calendar → Routines. They will appear here.',
+            style: TextStyle(color: Color(0xFF71767B)),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onOpenCalendar,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: const Text('Open Calendar'),
           ),
         ],
       ),
