@@ -7,6 +7,7 @@ import 'calendar_page.dart';
 import 'data/models.dart';
 import 'data/database_service.dart';
 import 'data/pexels_service.dart';
+import 'widgets/emoji_icon.dart';
 
 class SpacePage extends StatefulWidget {
   const SpacePage({
@@ -40,7 +41,7 @@ class _SpacePageState extends State<SpacePage>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
+    _tab = TabController(length: 5, vsync: this);
     _tab.addListener(() {
       if (!mounted) return;
       setState(() {});
@@ -131,6 +132,12 @@ class _SpacePageState extends State<SpacePage>
     String? description,
     String? goals,
     String? guide,
+    String? tone,
+    bool? advancedContext,
+    String? metadataJson,
+    bool? prefConcise,
+    bool? prefExamples,
+    bool? prefClarify,
   }) async {
     if (_space == null) return;
     final db = DBProvider.of(context);
@@ -138,6 +145,12 @@ class _SpacePageState extends State<SpacePage>
       description: description,
       goals: goals,
       guide: guide,
+      tone: tone,
+      advancedContext: advancedContext,
+      metadataJson: metadataJson,
+      prefConcise: prefConcise,
+      prefExamples: prefExamples,
+      prefClarify: prefClarify,
     );
     await db.upsertSpace(updated);
     if (!mounted) return;
@@ -166,9 +179,10 @@ class _SpacePageState extends State<SpacePage>
         titleSpacing: 0,
         title: Row(
           children: [
-            Text(
+            EmojiIcon(
               _space?.emoji ?? widget.emoji,
-              style: const TextStyle(fontSize: 18),
+              size: 20,
+              color: Colors.white70,
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -188,7 +202,10 @@ class _SpacePageState extends State<SpacePage>
             icon: const Icon(Icons.auto_awesome),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ChatPage(title: 'AI · ${widget.name}'),
+                builder: (_) => ChatPage(
+                  title: 'AI · ${widget.name}',
+                  spaceId: widget.spaceId,
+                ),
               ),
             ),
           ),
@@ -200,6 +217,7 @@ class _SpacePageState extends State<SpacePage>
             Tab(text: 'Routine'),
             Tab(text: 'Resources'),
             Tab(text: 'Gallery'),
+            Tab(text: 'Personalization'),
           ],
         ),
       ),
@@ -214,6 +232,7 @@ class _SpacePageState extends State<SpacePage>
         controller: _tab,
         children: [
           _StudyTab(
+            spaceId: widget.spaceId,
             spaceName: _space?.name ?? widget.name,
             description: _space?.description ?? '',
             goals: _space?.goals ?? '',
@@ -244,6 +263,21 @@ class _SpacePageState extends State<SpacePage>
             query: _space?.name ?? widget.name,
             pexelsKey: _pexelsKey,
             onTapReload: _maybeLoadBanner,
+          ),
+          _PersonalizationTab(
+            currentTone: _space?.tone ?? '',
+            advancedContext: _space?.advancedContext ?? true,
+            onSetTone: (t) => _saveSpace(tone: t),
+            onToggleAdvanced: (v) => _saveSpace(advancedContext: v),
+            banner: _BannerImage(urls: _bannerUrls),
+            metadataJson: _space?.metadataJson ?? '',
+            onEditMetadata: (j) => _saveSpace(metadataJson: j),
+            prefConcise: _space?.prefConcise ?? false,
+            prefExamples: _space?.prefExamples ?? true,
+            prefClarify: _space?.prefClarify ?? true,
+            onToggleConcise: (v) => _saveSpace(prefConcise: v),
+            onToggleExamples: (v) => _saveSpace(prefExamples: v),
+            onToggleClarify: (v) => _saveSpace(prefClarify: v),
           ),
         ],
       ),
@@ -293,13 +327,21 @@ class _SpaceRoutinesTab extends StatelessWidget {
             border: Border.all(color: const Color(0xFF2F3336)),
           ),
           child: ListTile(
-            leading: Text(s.emoji, style: const TextStyle(fontSize: 22)),
+            leading: EmojiIcon(
+              s.emoji,
+              size: 22,
+              color: const Color(0xFF71767B),
+            ),
             title: Text(s.title),
             subtitle: Text(
-              _formatDays(s.daysOfWeek) +
-                  (s.timeOfDay != null && s.timeOfDay!.isNotEmpty
-                      ? ' · ' + _formatTime(s.timeOfDay!)
-                      : ''),
+              [
+                _formatDays(s.daysOfWeek),
+                if ((s.timeOfDay ?? '').isNotEmpty)
+                  (s.endTimeOfDay?.isNotEmpty ?? false)
+                      ? _formatRange(s.timeOfDay!, s.endTimeOfDay!)
+                      : _formatTime(s.timeOfDay!),
+                if ((s.room ?? '').isNotEmpty) 'Room ${s.room}',
+              ].join(' · '),
               style: const TextStyle(color: Color(0xFF71767B)),
             ),
             trailing: IconButton(
@@ -339,6 +381,9 @@ class _SpaceRoutinesTab extends StatelessWidget {
     final mm = m.toString().padLeft(2, '0');
     return '$hour12:$mm $suffix';
   }
+
+  String _formatRange(String a, String b) =>
+      '${_formatTime(a)} - ${_formatTime(b)}';
 }
 
 class _RoutinesEmpty extends StatelessWidget {
@@ -380,6 +425,7 @@ class _RoutinesEmpty extends StatelessWidget {
 
 class _StudyTab extends StatelessWidget {
   const _StudyTab({
+    required this.spaceId,
     required this.spaceName,
     required this.description,
     required this.goals,
@@ -389,6 +435,7 @@ class _StudyTab extends StatelessWidget {
     required this.onEditGuide,
     required this.banner,
   });
+  final String spaceId;
   final String spaceName;
   final String description;
   final String goals;
@@ -458,7 +505,8 @@ class _StudyTab extends StatelessWidget {
               subtitle: 'Chat with an AI about $spaceName',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ChatPage(title: 'AI · $spaceName'),
+                  builder: (_) =>
+                      ChatPage(title: 'AI · $spaceName', spaceId: spaceId),
                 ),
               ),
             ),
@@ -554,6 +602,219 @@ class _StudyTab extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => const _ProgressSheet(),
+    );
+  }
+}
+
+class _PersonalizationTab extends StatelessWidget {
+  const _PersonalizationTab({
+    required this.currentTone,
+    required this.advancedContext,
+    required this.onSetTone,
+    required this.onToggleAdvanced,
+    required this.banner,
+    this.metadataJson = '',
+    required this.onEditMetadata,
+    this.prefConcise = false,
+    this.prefExamples = true,
+    this.prefClarify = true,
+    required this.onToggleConcise,
+    required this.onToggleExamples,
+    required this.onToggleClarify,
+  });
+  final String currentTone;
+  final bool advancedContext;
+  final ValueChanged<String> onSetTone;
+  final ValueChanged<bool> onToggleAdvanced;
+  final Widget banner;
+  final String metadataJson;
+  final ValueChanged<String> onEditMetadata;
+  final bool prefConcise;
+  final bool prefExamples;
+  final bool prefClarify;
+  final ValueChanged<bool> onToggleConcise;
+  final ValueChanged<bool> onToggleExamples;
+  final ValueChanged<bool> onToggleClarify;
+
+  static const List<String> tones = [
+    'Chatty',
+    'Witty',
+    'Straight shooting',
+    'Encouraging',
+    'Gen Z',
+    'Traditional',
+    'Forward thinking',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        banner,
+        const SizedBox(height: 12),
+        const _SectionTitle('Personalization'),
+        const SizedBox(height: 8),
+        _PersonalizationCard(
+          title: 'AI Tone',
+          subtitle:
+              'Choose how the AI talks inside this space. You can change anytime.',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in tones)
+                ChoiceChip(
+                  label: Text(t),
+                  selected: currentTone == t,
+                  onSelected: (_) => onSetTone(t),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _PersonalizationCard(
+          title: 'Advanced context',
+          subtitle:
+              'Let AI use this space’s description, goals, guide, resources, routines, and past chats for better answers.',
+          child: SwitchListTile(
+            value: advancedContext,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Enable advanced context'),
+            subtitle: const Text(
+              'Recommended. Turn off if you want short, standalone replies.',
+              style: TextStyle(color: Color(0xFF71767B)),
+            ),
+            onChanged: onToggleAdvanced,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _PersonalizationCard(
+          title: 'AI Preferences',
+          subtitle: 'Tune how answers are shaped.',
+          child: Column(
+            children: [
+              SwitchListTile(
+                value: prefConcise,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Prefer concise answers'),
+                onChanged: onToggleConcise,
+              ),
+              SwitchListTile(
+                value: prefExamples,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Prefer examples in answers'),
+                onChanged: onToggleExamples,
+              ),
+              SwitchListTile(
+                value: prefClarify,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Ask clarifying questions when needed'),
+                onChanged: onToggleClarify,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _PersonalizationCard(
+          title: 'Metadata (JSON)',
+          subtitle:
+              'Optional JSON with extra context for this space. Keep it short and meaningful.',
+          child: _MetadataEditor(initial: metadataJson, onSave: onEditMetadata),
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonalizationCard extends StatelessWidget {
+  const _PersonalizationCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2F3336)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(subtitle, style: const TextStyle(color: Color(0xFF71767B))),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MetadataEditor extends StatefulWidget {
+  const _MetadataEditor({required this.initial, required this.onSave});
+  final String initial;
+  final ValueChanged<String> onSave;
+
+  @override
+  State<_MetadataEditor> createState() => _MetadataEditorState();
+}
+
+class _MetadataEditorState extends State<_MetadataEditor> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MetadataEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initial != widget.initial) {
+      _ctrl.text = widget.initial;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _ctrl,
+          minLines: 4,
+          maxLines: 10,
+          decoration: const InputDecoration(
+            hintText: '{\n  "notes": "Any extra context"\n}',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: () => widget.onSave(_ctrl.text.trim()),
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Save'),
+          ),
+        ),
+      ],
     );
   }
 }

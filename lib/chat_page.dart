@@ -28,6 +28,7 @@ class _ChatPageState extends State<ChatPage> {
   String? _sessionId; // will generate on save if null
   DateTime? _createdAt;
   String? _titleOverride;
+  String? _activeSpaceId; // selected context space (may differ from initial)
 
   @override
   void dispose() {
@@ -124,6 +125,10 @@ class _ChatPageState extends State<ChatPage> {
                     setState(() => _createImageActive = !_createImageActive);
                     return;
                   }
+                  if (a == ChatAction.spaces) {
+                    _pickSpaceContext();
+                    return;
+                  }
                   ScaffoldMessenger.of(
                     context,
                   ).showSnackBar(SnackBar(content: Text('Action: ${a.name}')));
@@ -141,6 +146,63 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickSpaceContext() async {
+    final db = DBProvider.of(context);
+    final spaces = db.currentSpaces;
+    final selected = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              const Text(
+                'Space context',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.block),
+                title: const Text('No space context'),
+                onTap: () => Navigator.of(ctx).pop(null),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: spaces.length,
+                  itemBuilder: (c, i) {
+                    final s = spaces[i];
+                    final isSel = s.id == _activeSpaceId;
+                    return ListTile(
+                      leading: const Icon(Icons.folder_open),
+                      title: Text(s.name),
+                      trailing: isSel
+                          ? const Icon(Icons.check, color: Color(0xFF1D9BF0))
+                          : null,
+                      onTap: () => Navigator.of(ctx).pop(s.id),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted) return;
+    setState(() => _activeSpaceId = selected);
+    final label = selected == null
+        ? 'Space context cleared'
+        : 'Using context: ${db.currentSpaces.firstWhere((s) => s.id == selected).name}';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label)));
   }
 
   Future<void> _send() async {
@@ -166,6 +228,7 @@ class _ChatPageState extends State<ChatPage> {
         text,
         history: _asHistory(),
         model: _model,
+        spaceId: _activeSpaceId ?? widget.spaceId,
       );
       if (!mounted) return;
       setState(() {
@@ -248,6 +311,8 @@ class _ChatPageState extends State<ChatPage> {
     // Load preferred model from DB
     final db = DBProvider.of(context);
     _model = db.currentPreferredModel;
+    // Initialize active space context from incoming spaceId
+    _activeSpaceId = widget.spaceId;
     // Load a session if provided
     if (_sessionId == null && widget.sessionId != null) {
       final s = db.getChatSession(widget.sessionId!);
@@ -256,6 +321,7 @@ class _ChatPageState extends State<ChatPage> {
         _createdAt = s.createdAt;
         _model = s.model;
         _titleOverride = s.title;
+        _activeSpaceId = s.spaceId;
         _messages
           ..clear()
           ..addAll(
@@ -417,11 +483,17 @@ extension _SaveSession on _ChatPageState {
       createdAt: created,
       updatedAt: now,
       messageCount: msgs.length,
-      spaceId: widget.spaceId,
+      spaceId: _activeSpaceId ?? widget.spaceId,
       lastSnippet: _messages.lastNonEmptyTextSnippet(160),
       messages: msgs,
     );
     await db.upsertChatSession(session);
+    // Update combined history for linked space
+    final sid = session.spaceId;
+    if ((sid ?? '').isNotEmpty) {
+      // ignore: discarded_futures
+      db.rebuildSpaceComboHistory(sid!);
+    }
     // Fire-and-forget LLM memory analysis to build summary/hashtags/sections
     // ignore: discarded_futures
     LlmMemoryAnalyzer(db).analyzeSession(session).then((idx) async {

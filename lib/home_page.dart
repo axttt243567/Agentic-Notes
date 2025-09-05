@@ -6,8 +6,7 @@ import 'space_page.dart';
 import 'create_space_with_ai_page.dart';
 import 'data/models.dart';
 import 'dart:async';
-import 'chat_history_page.dart';
-import 'calendar_page.dart';
+import 'widgets/emoji_icon.dart';
 
 /// Home page: minimal shell with a profile button.
 class HomePage extends StatefulWidget {
@@ -99,16 +98,9 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Agentic Notes'),
         actions: [
           IconButton(
-            tooltip: 'Calendar',
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const CalendarPage())),
-            icon: const Icon(Icons.calendar_today),
-          ),
-          IconButton(
-            tooltip: 'Chat',
-            onPressed: _openChat,
-            icon: const Icon(Icons.history),
+            tooltip: 'New chat',
+            onPressed: _openNewChat,
+            icon: const Icon(Icons.auto_awesome),
           ),
           IconButton(
             tooltip: 'Profile',
@@ -316,9 +308,10 @@ class _HomePageState extends State<HomePage> {
                     leading: CircleAvatar(
                       backgroundColor: const Color(0x00000000),
                       foregroundColor: const Color(0x00000000),
-                      child: Text(
+                      child: EmojiIcon(
                         sc.emoji,
-                        style: const TextStyle(fontSize: 20),
+                        size: 20,
+                        color: const Color(0xFF71767B),
                       ),
                     ),
                     title: Text(
@@ -329,7 +322,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     subtitle: Text(
                       [
-                        sc.timeOfDay ?? 'Anytime',
+                        _formatTimeRange(sc) ?? 'Anytime',
                         if (sc.spaceId != null)
                           () {
                             final match = _spaces.firstWhere(
@@ -339,6 +332,7 @@ class _HomePageState extends State<HomePage> {
                             );
                             return match.id.isEmpty ? null : '· ${match.name}';
                           }(),
+                        if ((sc.room ?? '').isNotEmpty) '· Room ${sc.room}',
                       ].whereType<String>().join(' '),
                       style: const TextStyle(
                         color: Color(0xFF71767B),
@@ -375,10 +369,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   // App bar actions & space creation
-  void _openChat() {
+  void _openNewChat() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const ChatHistoryPage()));
+    ).push(MaterialPageRoute(builder: (_) => const ChatPage()));
   }
 
   void _openProfile() {
@@ -471,6 +465,25 @@ class _HomePageState extends State<HomePage> {
   String _formatYMD(DateTime d) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+
+  String? _formatTimeRange(ScheduleModel s) {
+    final start = s.timeOfDay;
+    if (start == null || start.isEmpty) return null;
+    final end = s.endTimeOfDay;
+    if (end == null || end.isEmpty) return _format12h(start);
+    return '${_format12h(start)}-${_format12h(end)}';
+  }
+
+  String _format12h(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return hhmm;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    final hour12 = h % 12 == 0 ? 12 : h % 12;
+    final mm = m.toString().padLeft(2, '0');
+    return '$hour12:$mm$suffix';
   }
 
   Widget _smartSuggestionsSection(BuildContext context) {
@@ -579,7 +592,8 @@ class _HomePageState extends State<HomePage> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ChatPage(title: 'AI · ${sp.name}'),
+                builder: (_) =>
+                    ChatPage(title: 'AI · ${sp.name}', spaceId: sp.id),
               ),
             );
           },
@@ -663,7 +677,11 @@ class _SpaceRow extends StatelessWidget {
           border: Border.all(color: const Color(0xFF2F3336)),
         ),
         child: Center(
-          child: Text(space.emoji, style: const TextStyle(fontSize: 20)),
+          child: EmojiIcon(
+            space.emoji,
+            size: 20,
+            color: const Color(0xFF71767B),
+          ),
         ),
       ),
       title: Text(

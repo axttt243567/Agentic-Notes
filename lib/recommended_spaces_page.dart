@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 import 'data/models.dart';
 import 'data/image_search.dart';
+import 'widgets/emoji_icon.dart';
 
 class RecommendedSpacesPage extends StatelessWidget {
   const RecommendedSpacesPage({super.key});
@@ -72,7 +73,14 @@ class _RecommendChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InputChip(
-      label: Text('${rec.emoji} ${rec.name}'),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          EmojiIcon(rec.emoji, size: 16, color: const Color(0xFF71767B)),
+          const SizedBox(width: 6),
+          Flexible(child: Text(rec.name, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
       onPressed: () async {
         final addedName = await Navigator.of(context).push<String>(
           MaterialPageRoute(builder: (_) => _SpacePreviewPage(rec: rec)),
@@ -159,14 +167,16 @@ class _SpacePreviewPageState extends State<_SpacePreviewPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(rec.emoji, style: const TextStyle(fontSize: 40)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 2),
+              EmojiIcon(rec.emoji, size: 28, color: Colors.white70),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   rec.name,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

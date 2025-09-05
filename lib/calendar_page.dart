@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'data/models.dart';
 import 'main.dart';
+import 'widgets/emoji_icon.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -252,7 +253,7 @@ class _RoutineChips extends StatelessWidget {
                 avatar: CircleAvatar(
                   radius: 10,
                   backgroundColor: const Color(0xFF2F3336),
-                  child: Text(s.emoji, style: const TextStyle(fontSize: 12)),
+                  child: EmojiIcon(s.emoji, size: 14, color: Colors.white70),
                 ),
                 label: Text(s.title),
                 selected: selectedIds.contains(s.id),
@@ -437,14 +438,14 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: const Color(0xFF2F3336),
-                    child: Text(s.emoji, style: const TextStyle(fontSize: 16)),
+                    child: EmojiIcon(s.emoji, size: 18, color: Colors.white70),
                   ),
                   title: Text(
                     s.title,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(
-                    s.timeOfDay ?? 'Anytime',
+                    _subtitleFor(s),
                     style: const TextStyle(
                       color: Color(0xFF71767B),
                       fontSize: 12,
@@ -457,6 +458,32 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
         ),
       ],
     );
+  }
+
+  String _subtitleFor(ScheduleModel s) {
+    final start = s.timeOfDay;
+    final end = s.endTimeOfDay;
+    String time;
+    if ((start ?? '').isEmpty) {
+      time = 'Anytime';
+    } else if ((end ?? '').isEmpty) {
+      time = _fmt(start!);
+    } else {
+      time = '${_fmt(start!)}-${_fmt(end!)}';
+    }
+    if ((s.room ?? '').isNotEmpty) time += ' · Room ${s.room}';
+    return time;
+  }
+
+  String _fmt(String hhmm) {
+    final p = hhmm.split(':');
+    if (p.length != 2) return hhmm;
+    final h = int.tryParse(p[0]) ?? 0;
+    final m = int.tryParse(p[1]) ?? 0;
+    final am = h < 12;
+    final hh = h % 12 == 0 ? 12 : h % 12;
+    final mm = m.toString().padLeft(2, '0');
+    return '$hh:$mm${am ? 'AM' : 'PM'}';
   }
 
   Future<void> _openAdd() async {
@@ -478,7 +505,7 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
     final demos = <ScheduleModel>[
       ScheduleModel(
         id: 'demo-${now.millisecondsSinceEpoch}-1',
-        title: '🏋️ Gym',
+        title: 'Gym',
         emoji: '🏋️',
         spaceId: null,
         daysOfWeek: const [1, 3, 5], // Mon, Wed, Fri
@@ -488,7 +515,7 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
       ),
       ScheduleModel(
         id: 'demo-${now.millisecondsSinceEpoch}-2',
-        title: '📚 Study',
+        title: 'Study',
         emoji: '📚',
         spaceId: null,
         daysOfWeek: const [2, 4], // Tue, Thu
@@ -498,7 +525,7 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
       ),
       ScheduleModel(
         id: 'demo-${now.millisecondsSinceEpoch}-3',
-        title: '🧘 Meditation',
+        title: 'Meditation',
         emoji: '🧘',
         spaceId: null,
         daysOfWeek: const [1, 2, 3, 4, 5, 6, 7], // Daily
@@ -508,7 +535,7 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
       ),
       ScheduleModel(
         id: 'demo-${now.millisecondsSinceEpoch}-4',
-        title: '💻 Coding',
+        title: 'Coding',
         emoji: '💻',
         spaceId: null,
         daysOfWeek: const [6, 7], // Sat, Sun
@@ -537,6 +564,8 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
   late final TextEditingController _emojiCtrl;
   late Set<int> _days;
   String? _time; // HH:mm
+  String? _endTime; // HH:mm
+  String? _room;
   String? _selectedCategoryId;
   String? _selectedSpaceId;
 
@@ -550,6 +579,8 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
       ...(s?.daysOfWeek ?? const [1, 2, 3, 4, 5]),
     };
     _time = s?.timeOfDay;
+    _endTime = s?.endTimeOfDay;
+    _room = s?.room;
     _selectedCategoryId = s?.categoryId;
     _selectedSpaceId = s?.spaceId;
   }
@@ -680,7 +711,19 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                 ...spaces.map(
                   (s) => DropdownMenuItem<String?>(
                     value: s.id,
-                    child: Text('${s.emoji} ${s.name}'),
+                    child: Row(
+                      children: [
+                        EmojiIcon(
+                          s.emoji,
+                          size: 14,
+                          color: const Color(0xFF71767B),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(s.name, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -712,7 +755,7 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                 Expanded(
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Time (optional)',
+                      labelText: 'Start time (optional)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
@@ -732,7 +775,42 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'End time (optional)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                    child: InkWell(
+                      onTap: _pickEndTime,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _endTime ?? '—',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const Icon(Icons.access_time, size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Room (optional)',
+                hintText: 'e.g., C-301',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+              onChanged: (v) => _room = v.trim().isEmpty ? null : v.trim(),
             ),
             const SizedBox(height: 16),
             Row(
@@ -760,6 +838,15 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
     setState(() => _time = '$hh:$mm');
   }
 
+  Future<void> _pickEndTime() async {
+    final now = TimeOfDay.now();
+    final picked = await showTimePicker(context: context, initialTime: now);
+    if (picked == null) return;
+    final hh = picked.hour.toString().padLeft(2, '0');
+    final mm = picked.minute.toString().padLeft(2, '0');
+    setState(() => _endTime = '$hh:$mm');
+  }
+
   void _submit() {
     final title = _titleCtrl.text.trim();
     final emoji = _emojiCtrl.text.trim().isEmpty ? '📘' : _emojiCtrl.text;
@@ -775,6 +862,9 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                   categoryId: _selectedCategoryId,
                   daysOfWeek: _days.toList()..sort(),
                   timeOfDay: _time,
+                  endTimeOfDay: _endTime,
+                  durationMinutes: _calcDuration(_time, _endTime),
+                  room: _room,
                   createdAt: now,
                   updatedAt: now,
                 ))
@@ -785,9 +875,24 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
               categoryId: _selectedCategoryId,
               daysOfWeek: _days.toList()..sort(),
               timeOfDay: _time,
+              endTimeOfDay: _endTime,
+              durationMinutes: _calcDuration(_time, _endTime),
+              room: _room,
               updatedAt: now,
             );
     Navigator.of(context).pop(model);
+  }
+
+  int? _calcDuration(String? start, String? end) {
+    if (start == null || end == null) return null;
+    final sp = start.split(':'), ep = end.split(':');
+    if (sp.length != 2 || ep.length != 2) return null;
+    final sh = int.tryParse(sp[0]) ?? 0;
+    final sm = int.tryParse(sp[1]) ?? 0;
+    final eh = int.tryParse(ep[0]) ?? 0;
+    final em = int.tryParse(ep[1]) ?? 0;
+    final diff = (eh * 60 + em) - (sh * 60 + sm);
+    return diff > 0 ? diff : null;
   }
 }
 
@@ -973,7 +1078,7 @@ class _RoutineTile extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF2F3336),
-          child: Text(s.emoji, style: const TextStyle(fontSize: 16)),
+          child: EmojiIcon(s.emoji, size: 18, color: Colors.white70),
         ),
         title: Text(
           s.title,
@@ -994,9 +1099,21 @@ class _RoutineTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: const Color(0xFF2F3336)),
                 ),
-                child: Text(
-                  '${space!.emoji} ${space!.name}',
-                  style: const TextStyle(fontSize: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EmojiIcon(
+                      space!.emoji,
+                      size: 14,
+                      color: const Color(0xFF71767B),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      space!.name,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             const SizedBox(width: 4),
@@ -1055,7 +1172,16 @@ class _RoutineTile extends StatelessWidget {
 
 String _daysAndTimeLabel(ScheduleModel s) {
   final days = s.daysOfWeek.map(_weekdayLabel).join(', ');
-  return s.timeOfDay == null ? days : '$days · ${s.timeOfDay}';
+  String time;
+  if ((s.timeOfDay ?? '').isEmpty) {
+    time = 'Anytime';
+  } else if ((s.endTimeOfDay ?? '').isEmpty) {
+    time = s.timeOfDay!;
+  } else {
+    time = '${s.timeOfDay}-${s.endTimeOfDay}';
+  }
+  final room = (s.room ?? '').isEmpty ? null : 'Room ${s.room}';
+  return [days, time, room].whereType<String>().join(' · ');
 }
 
 Future<String?> _promptText(BuildContext context, String title) async {

@@ -4,6 +4,7 @@ import 'home_page.dart';
 import 'main.dart';
 import 'data/models.dart';
 import 'data/student_suggestions.dart';
+import 'data/semester_catalog.dart';
 
 class ProfileDraft {
   String? name;
@@ -144,6 +145,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                               if (db.currentActiveApiKeyId == null) {
                                 await db.setActiveApiKeyId(id);
                               }
+                            }
+                            // Seed semester/section demo data (spaces + routines)
+                            if (db != null) {
+                              try {
+                                await seedForProfileIfEmpty(db);
+                              } catch (_) {}
                             }
                             if (!context.mounted) return;
                             Navigator.of(context).pushReplacement(

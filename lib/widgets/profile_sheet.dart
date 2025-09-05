@@ -5,6 +5,9 @@ import '../main.dart';
 import '../data/models.dart';
 import '../onboarding.dart';
 import '../profile_page.dart';
+import 'emoji_icon.dart';
+import '../calendar_page.dart';
+import '../chat_history_page.dart';
 
 class ProfileSheet extends StatefulWidget {
   const ProfileSheet({super.key});
@@ -113,6 +116,51 @@ class _ProfileSheetState extends State<ProfileSheet> {
                   nav.pop();
                   nav.push(
                     MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // History
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2F3336)),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.history, color: Color(0xFF71767B)),
+                title: const Text('History'),
+                subtitle: const Text('View your chat history'),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  nav.push(
+                    MaterialPageRoute(builder: (_) => const ChatHistoryPage()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Calendar
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2F3336)),
+              ),
+              child: ListTile(
+                leading: const Icon(
+                  Icons.calendar_today_outlined,
+                  color: Color(0xFF71767B),
+                ),
+                title: const Text('Calendar'),
+                subtitle: const Text('View and manage schedules'),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  nav.push(
+                    MaterialPageRoute(builder: (_) => const CalendarPage()),
                   );
                 },
               ),
@@ -580,7 +628,23 @@ class _ProfileSheetState extends State<ProfileSheet> {
                               ['🌍', 'Geography'],
                             ])
                               InputChip(
-                                label: Text('${s[0]} ${s[1]}'),
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    EmojiIcon(
+                                      s[0],
+                                      size: 16,
+                                      color: const Color(0xFF71767B),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        s[1],
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 onPressed: () async {
                                   final db = DBProvider.of(context);
                                   final id = DateTime.now()
@@ -606,7 +670,23 @@ class _ProfileSheetState extends State<ProfileSheet> {
                           children: [
                             for (final sp in _spaces)
                               InputChip(
-                                label: Text('${sp.emoji} ${sp.name}'),
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    EmojiIcon(
+                                      sp.emoji,
+                                      size: 16,
+                                      color: const Color(0xFF71767B),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        sp.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 onPressed: () {
                                   ScaffoldMessenger.of(ctx).showSnackBar(
                                     const SnackBar(

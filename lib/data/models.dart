@@ -90,6 +90,12 @@ class SpaceModel {
   final String description; // free text
   final String goals; // free text
   final String guide; // free text
+  final String tone; // e.g., Chatty, Witty, Straight shooting, etc.
+  final bool advancedContext; // when true, inject rich space context into chat
+  final String metadataJson; // user-editable JSON driving space context
+  final bool prefConcise; // prefer concise answers
+  final bool prefExamples; // prefer examples
+  final bool prefClarify; // ask clarifying questions when needed
 
   const SpaceModel({
     required this.id,
@@ -98,6 +104,12 @@ class SpaceModel {
     this.description = '',
     this.goals = '',
     this.guide = '',
+    this.tone = '',
+    this.advancedContext = true,
+    this.metadataJson = '',
+    this.prefConcise = false,
+    this.prefExamples = true,
+    this.prefClarify = true,
   });
 
   SpaceModel copyWith({
@@ -107,6 +119,12 @@ class SpaceModel {
     String? description,
     String? goals,
     String? guide,
+    String? tone,
+    bool? advancedContext,
+    String? metadataJson,
+    bool? prefConcise,
+    bool? prefExamples,
+    bool? prefClarify,
   }) => SpaceModel(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -114,6 +132,12 @@ class SpaceModel {
     description: description ?? this.description,
     goals: goals ?? this.goals,
     guide: guide ?? this.guide,
+    tone: tone ?? this.tone,
+    advancedContext: advancedContext ?? this.advancedContext,
+    metadataJson: metadataJson ?? this.metadataJson,
+    prefConcise: prefConcise ?? this.prefConcise,
+    prefExamples: prefExamples ?? this.prefExamples,
+    prefClarify: prefClarify ?? this.prefClarify,
   );
 
   Map<String, dynamic> toJson() => {
@@ -123,6 +147,12 @@ class SpaceModel {
     if (description.isNotEmpty) 'description': description,
     if (goals.isNotEmpty) 'goals': goals,
     if (guide.isNotEmpty) 'guide': guide,
+    if (tone.isNotEmpty) 'tone': tone,
+    'advancedContext': advancedContext,
+    if (metadataJson.isNotEmpty) 'metadataJson': metadataJson,
+    'prefConcise': prefConcise,
+    'prefExamples': prefExamples,
+    'prefClarify': prefClarify,
   };
 
   factory SpaceModel.fromJson(Map<String, dynamic> json) => SpaceModel(
@@ -132,7 +162,48 @@ class SpaceModel {
     description: json['description'] as String? ?? '',
     goals: json['goals'] as String? ?? '',
     guide: json['guide'] as String? ?? '',
+    tone: json['tone'] as String? ?? '',
+    advancedContext: (json['advancedContext'] as bool?) ?? true,
+    metadataJson: json['metadataJson'] as String? ?? '',
+    prefConcise: (json['prefConcise'] as bool?) ?? false,
+    prefExamples: (json['prefExamples'] as bool?) ?? true,
+    prefClarify: (json['prefClarify'] as bool?) ?? true,
   );
+}
+
+@immutable
+class SpaceComboHistoryModel {
+  final String spaceId; // unique per space
+  final String content; // concatenated interactions text
+  final DateTime updatedAt;
+
+  const SpaceComboHistoryModel({
+    required this.spaceId,
+    required this.content,
+    required this.updatedAt,
+  });
+
+  SpaceComboHistoryModel copyWith({String? content, DateTime? updatedAt}) =>
+      SpaceComboHistoryModel(
+        spaceId: spaceId,
+        content: content ?? this.content,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'spaceId': spaceId,
+    'content': content,
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory SpaceComboHistoryModel.fromJson(Map<String, dynamic> json) =>
+      SpaceComboHistoryModel(
+        spaceId: json['spaceId'] as String,
+        content: json['content'] as String? ?? '',
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
 }
 
 @immutable
@@ -601,6 +672,9 @@ class ScheduleModel {
   final String? categoryId; // optional link to a routine category
   final List<int> daysOfWeek; // 1=Mon ... 7=Sun
   final String? timeOfDay; // HH:mm (24h)
+  final String? endTimeOfDay; // HH:mm (24h) optional end time
+  final int? durationMinutes; // optional duration in minutes
+  final String? room; // optional classroom identifier
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -612,6 +686,9 @@ class ScheduleModel {
     this.categoryId,
     required this.daysOfWeek,
     this.timeOfDay,
+    this.endTimeOfDay,
+    this.durationMinutes,
+    this.room,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -624,6 +701,9 @@ class ScheduleModel {
     String? categoryId,
     List<int>? daysOfWeek,
     String? timeOfDay,
+    String? endTimeOfDay,
+    int? durationMinutes,
+    String? room,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => ScheduleModel(
@@ -634,6 +714,9 @@ class ScheduleModel {
     categoryId: categoryId ?? this.categoryId,
     daysOfWeek: daysOfWeek ?? this.daysOfWeek,
     timeOfDay: timeOfDay ?? this.timeOfDay,
+    endTimeOfDay: endTimeOfDay ?? this.endTimeOfDay,
+    durationMinutes: durationMinutes ?? this.durationMinutes,
+    room: room ?? this.room,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -646,6 +729,9 @@ class ScheduleModel {
     if (categoryId != null) 'categoryId': categoryId,
     'daysOfWeek': daysOfWeek,
     if (timeOfDay != null) 'timeOfDay': timeOfDay,
+    if (endTimeOfDay != null) 'endTimeOfDay': endTimeOfDay,
+    if (durationMinutes != null) 'durationMinutes': durationMinutes,
+    if (room != null) 'room': room,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -660,6 +746,9 @@ class ScheduleModel {
         .map((e) => (e as num).toInt())
         .toList(growable: false),
     timeOfDay: json['timeOfDay'] as String?,
+    endTimeOfDay: json['endTimeOfDay'] as String?,
+    durationMinutes: (json['durationMinutes'] as num?)?.toInt(),
+    room: json['room'] as String?,
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ??
         DateTime.fromMillisecondsSinceEpoch(0),

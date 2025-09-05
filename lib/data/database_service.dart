@@ -15,6 +15,7 @@ class DatabaseService {
   static const _boxSchedules = 'schedules_box';
   static const _boxAttendance = 'attendance_box';
   static const _boxRoutineCategories = 'routine_categories_box';
+  static const _boxSpaceComboHistory = 'space_combo_history_box';
   static const _activeKeyField = 'active_api_key_id';
   static const _suggestLevelField =
       'suggest_level'; // 'less' | 'balanced' | 'more'
@@ -31,6 +32,7 @@ class DatabaseService {
   late final Box _schedules;
   late final Box _attendance;
   late final Box _routineCategories;
+  late final Box _spaceComboHistory;
 
   final _profileCtrl = StreamController<UserProfileModel>.broadcast();
   final _apiKeysCtrl = StreamController<List<ApiKeyModel>>.broadcast();
@@ -49,6 +51,8 @@ class DatabaseService {
       StreamController<Map<String, AttendanceEntryModel>>.broadcast();
   final _routineCategoriesCtrl =
       StreamController<List<RoutineCategoryModel>>.broadcast();
+  final _spaceComboHistoryCtrl =
+      StreamController<Map<String, SpaceComboHistoryModel>>.broadcast();
 
   Stream<UserProfileModel> get profileStream => _profileCtrl.stream;
   Stream<List<ApiKeyModel>> get apiKeysStream => _apiKeysCtrl.stream;
@@ -82,6 +86,10 @@ class DatabaseService {
   Map<String, AttendanceEntryModel> get currentAttendance => _readAttendance();
   List<RoutineCategoryModel> get currentRoutineCategories =>
       _readRoutineCategories();
+  Map<String, SpaceComboHistoryModel> get currentSpaceComboHistory =>
+      _readSpaceComboHistory();
+  Stream<Map<String, SpaceComboHistoryModel>> get spaceComboHistoryStream =>
+      _spaceComboHistoryCtrl.stream;
 
   static Future<DatabaseService> init() async {
     await Hive.initFlutter();
@@ -96,6 +104,7 @@ class DatabaseService {
     svc._schedules = await Hive.openBox(_boxSchedules);
     svc._attendance = await Hive.openBox(_boxAttendance);
     svc._routineCategories = await Hive.openBox(_boxRoutineCategories);
+    svc._spaceComboHistory = await Hive.openBox(_boxSpaceComboHistory);
 
     // Seed defaults if empty
     if (!svc._profile.containsKey('user')) {
@@ -124,6 +133,7 @@ class DatabaseService {
     svc._schedules.watch().listen((_) => svc._emitSchedules());
     svc._attendance.watch().listen((_) => svc._emitAttendance());
     svc._routineCategories.watch().listen((_) => svc._emitRoutineCategories());
+    svc._spaceComboHistory.watch().listen((_) => svc._emitSpaceComboHistory());
     svc._profile
         .watch(key: _activeKeyField)
         .listen((_) => svc._emitActiveKey());
@@ -150,6 +160,7 @@ class DatabaseService {
     _schedulesCtrl.close();
     _attendanceCtrl.close();
     _routineCategoriesCtrl.close();
+    _spaceComboHistoryCtrl.close();
   }
 
   // Profile operations
@@ -425,6 +436,10 @@ class DatabaseService {
     return items;
   }
 
+  List<ChatSessionModel> getChatSessionsBySpace(String spaceId) {
+    return _readChatSessions().where((s) => s.spaceId == spaceId).toList();
+  }
+
   List<MemoryItemModel> _readMemories() {
     final items = <MemoryItemModel>[];
     for (final k in _memories.keys) {
@@ -435,12 +450,63 @@ class DatabaseService {
     return items;
   }
 
+  // Space combo history operations
+  Future<void> upsertSpaceComboHistory(SpaceComboHistoryModel item) async {
+    await _spaceComboHistory.put(item.spaceId, item.toJson());
+    _emitSpaceComboHistory();
+  }
+
+  SpaceComboHistoryModel? getSpaceComboHistory(String spaceId) {
+    final json = (_spaceComboHistory.get(spaceId) as Map?)
+        ?.cast<String, dynamic>();
+    if (json == null) return null;
+    return SpaceComboHistoryModel.fromJson(json);
+  }
+
+  /// Rebuilds the combined chat history text for a given space by
+  /// concatenating all messages from sessions linked to that space.
+  Future<void> rebuildSpaceComboHistory(String spaceId) async {
+    final sessions =
+        _readChatSessions().where((s) => s.spaceId == spaceId).toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final buf = StringBuffer();
+    for (final s in sessions) {
+      if (s.messages.isEmpty) continue;
+      buf.writeln('# ${s.title.isEmpty ? 'Chat' : s.title}');
+      for (final m in s.messages) {
+        final t = (m.text).trim();
+        if (t.isEmpty) continue;
+        final role = m.role == 'user' ? 'User' : 'Assistant';
+        buf.writeln('$role: $t');
+      }
+      buf.writeln();
+    }
+    final content = buf.toString().trim();
+    final now = DateTime.now();
+    final model = SpaceComboHistoryModel(
+      spaceId: spaceId,
+      content: content,
+      updatedAt: now,
+    );
+    await upsertSpaceComboHistory(model);
+  }
+
   Map<String, MemoryIndexModel> _readMemoryIndex() {
     final map = <String, MemoryIndexModel>{};
     for (final k in _memoryIndex.keys) {
       final json = (_memoryIndex.get(k) as Map).cast<String, dynamic>();
       final m = MemoryIndexModel.fromJson(json);
       map[m.sessionId] = m;
+    }
+    return map;
+  }
+
+  Map<String, SpaceComboHistoryModel> _readSpaceComboHistory() {
+    final map = <String, SpaceComboHistoryModel>{};
+    for (final k in _spaceComboHistory.keys) {
+      final json = (_spaceComboHistory.get(k) as Map).cast<String, dynamic>();
+      final m = SpaceComboHistoryModel.fromJson(json);
+      map[m.spaceId] = m;
     }
     return map;
   }
@@ -511,6 +577,8 @@ class DatabaseService {
   void _emitAttendance() => _attendanceCtrl.add(_readAttendance());
   void _emitRoutineCategories() =>
       _routineCategoriesCtrl.add(_readRoutineCategories());
+  void _emitSpaceComboHistory() =>
+      _spaceComboHistoryCtrl.add(_readSpaceComboHistory());
 
   /// Danger zone: wipes all persisted app data and re-seeds minimal defaults.
   /// This clears profile, API keys, spaces, students, and chat sessions.
@@ -527,6 +595,7 @@ class DatabaseService {
       _schedules.clear(),
       _attendance.clear(),
       _routineCategories.clear(),
+      _spaceComboHistory.clear(),
     ]);
 
     // Re-seed minimal defaults expected by the UI
@@ -544,5 +613,6 @@ class DatabaseService {
     _emitSchedules();
     _emitAttendance();
     _emitRoutineCategories();
+    _emitSpaceComboHistory();
   }
 }

@@ -5,6 +5,7 @@ import 'chat_page.dart';
 import 'data/memory_builder.dart';
 import 'memory_insights_page.dart';
 import 'dart:async';
+import 'widgets/emoji_icon.dart';
 
 class ChatHistoryPage extends StatefulWidget {
   const ChatHistoryPage({super.key});
@@ -499,15 +500,77 @@ class _SpaceHistory extends StatelessWidget {
         final key = orderedKeys[idx];
         final group = sections[key]!
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        final title = key == null ? 'Unassigned' : '${key.emoji} ${key.name}';
+        final title = key == null ? 'Unassigned' : key.name;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              child: Row(
+                children: [
+                  if (key != null) ...[
+                    EmojiIcon(
+                      key.emoji,
+                      size: 16,
+                      color: const Color(0xFF71767B),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (key != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        final db = DBProvider.of(context);
+                        final combo = db.getSpaceComboHistory(key.id);
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text('Combined history — ${key.name}'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: SingleChildScrollView(
+                                child: Text(
+                                  (combo?.content ?? '').isEmpty
+                                      ? '(empty)'
+                                      : combo!.content,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('Close'),
+                              ),
+                              FilledButton(
+                                onPressed: () async {
+                                  Navigator.of(ctx).pop();
+                                  await DBProvider.of(
+                                    context,
+                                  ).rebuildSpaceComboHistory(key.id);
+                                  // ignore: use_build_context_synchronously
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Combined history rebuilt'),
+                                    ),
+                                  );
+                                },
+                                child: const Text('Rebuild'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.subject, size: 16),
+                      label: const Text('Combined'),
+                    ),
+                ],
               ),
             ),
             const Divider(height: 1),
