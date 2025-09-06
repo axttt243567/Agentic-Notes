@@ -1157,157 +1157,142 @@ class _RoutinesManagerView extends StatelessWidget {
       byCat.putIfAbsent(s.categoryId, () => []).add(s);
     }
     final spaceMap = {for (final s in spaces) s.id: s};
+    final uncategorized = byCat[null] ?? const [];
 
-    final sections = <Widget>[];
-    // Categories first
+    List<Widget> buildRoutineList(List<ScheduleModel> list) => list
+        .map((s) => _RoutineCompactTile(
+              schedule: s,
+              space: spaceMap[s.spaceId],
+            ))
+        .toList();
+
+    final categorySections = <Widget>[];
     for (final c in categories) {
       final items = byCat[c.id] ?? const [];
-      sections.addAll([
-        _SectionHeader(
-          title: c.name,
-          actions: [
-            PopupMenuButton<String>(
-              tooltip: 'Category actions',
-              onSelected: (v) async {
-                if (v == 'rename') {
-                  final name = await _promptText(context, 'Rename category');
-                  if (name == null || name.trim().isEmpty) return;
-                  final now = DateTime.now();
-                  final updated = c.copyWith(name: name.trim(), updatedAt: now);
-                  await DBProvider.of(context).upsertRoutineCategory(updated);
-                } else if (v == 'delete') {
-                  if ((byCat[c.id] ?? const []).isNotEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Move or delete routines in this category first.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  await DBProvider.of(context).deleteRoutineCategory(c.id);
-                }
-              },
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(value: 'rename', child: Text('Rename')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
-          ],
-        ),
-        ...items.map((s) => _RoutineTile(s: s, space: spaceMap[s.spaceId])),
-        const SizedBox(height: 8),
-      ]);
-    }
-    // Uncategorized
-    final uncategorized = byCat[null] ?? const [];
-    sections.addAll([
-      if (uncategorized.isNotEmpty)
-        _SectionHeader(title: 'Uncategorized', actions: const []),
-      ...uncategorized.map(
-        (s) => _RoutineTile(s: s, space: spaceMap[s.spaceId]),
-      ),
-    ]);
-
-    return Column(
-      children: [
+      if (items.isEmpty) continue;
+      categorySections.add(
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          padding: const EdgeInsets.only(top: 16, bottom: 4),
           child: Row(
             children: [
-              const Text(
-                'Routines',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                c.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
-              const Spacer(),
-              TextButton(
-                onPressed: () async {
-                  final name = await _promptText(context, 'New category');
-                  if (name == null || name.trim().isEmpty) return;
-                  final now = DateTime.now();
-                  final cat = RoutineCategoryModel(
-                    id: now.millisecondsSinceEpoch.toString(),
-                    name: name.trim(),
-                    createdAt: now,
-                    updatedAt: now,
-                  );
-                  await DBProvider.of(context).upsertRoutineCategory(cat);
-                },
-                child: const Text('Add category'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () async {
-                  final created = await showModalBottomSheet<ScheduleModel>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                    ),
-                    builder: (ctx) => const _AddRoutineSheet(),
-                  );
-                  if (created == null) return;
-                  await DBProvider.of(context).upsertSchedule(created);
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add routine'),
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16181A),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF2F3336)),
+                ),
+                child: Text(
+                  '${items.length}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF71767B)),
+                ),
               ),
             ],
           ),
         ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            children: sections.isEmpty
-                ? [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A0A0A),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF2F3336)),
-                      ),
-                      child: const Text(
-                        'No routines yet. Create one to get started.',
-                        style: TextStyle(color: Color(0xFF71767B)),
-                      ),
-                    ),
-                  ]
-                : sections,
-          ),
+      );
+      categorySections.addAll(buildRoutineList(items));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        const Text(
+          'Your routines',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
         ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            ActionChip(
+              label: const Text('Manage categories'),
+              avatar: const Icon(Icons.tune, size: 18),
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (_) => _ManageCategoriesSheet(
+                    categories: categories,
+                    byCat: byCat,
+                  ),
+                );
+              },
+            ),
+            ActionChip(
+              label: const Text('+ Add routine'),
+              avatar: const Icon(Icons.add, size: 18),
+              onPressed: () async {
+                final created = await showModalBottomSheet<ScheduleModel>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (ctx) => const _AddRoutineSheet(),
+                );
+                if (created == null) return;
+                await DBProvider.of(context).upsertSchedule(created);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (schedules.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0A0A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2F3336)),
+            ),
+            child: const Text(
+              'No routines yet. Add your first one.',
+              style: TextStyle(color: Color(0xFF71767B)),
+            ),
+          )
+        else ...[
+          if (uncategorized.isNotEmpty) ...[
+            const Text(
+              'Uncategorized',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...buildRoutineList(uncategorized),
+            if (categorySections.isNotEmpty) const SizedBox(height: 12),
+          ],
+          ...categorySections,
+        ],
       ],
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.actions});
-  final String title;
-  final List<Widget> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-      child: Row(
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          const Spacer(),
-          ...actions,
-        ],
-      ),
-    );
-  }
-}
-
-class _RoutineTile extends StatelessWidget {
-  const _RoutineTile({required this.s, this.space});
-  final ScheduleModel s;
+class _RoutineCompactTile extends StatelessWidget {
+  const _RoutineCompactTile({required this.schedule, this.space});
+  final ScheduleModel schedule;
   final SpaceModel? space;
 
   @override
@@ -1316,22 +1301,11 @@ class _RoutineTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF2F3336)),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF2F3336),
-          child: EmojiIcon(s.emoji, size: 18, color: Colors.white70),
-        ),
-        title: Text(
-          s.title,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          _daysAndTimeLabel(s),
-          style: const TextStyle(color: Color(0xFF71767B), fontSize: 12),
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
         onTap: () {
           showModalBottomSheet(
             context: context,
@@ -1340,90 +1314,241 @@ class _RoutineTile extends StatelessWidget {
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder: (ctx) => _RoutineDetailSheet(schedule: s, space: space),
+            builder: (ctx) => _RoutineDetailSheet(
+              schedule: schedule,
+              space: space,
+            ),
           );
         },
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (space != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16181A),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: const Color(0xFF2F3336)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF2F3336),
+                child: EmojiIcon(
+                  schedule.emoji,
+                  size: 18,
+                  color: Colors.white70,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    EmojiIcon(
-                      space!.emoji,
-                      size: 14,
-                      color: const Color(0xFF71767B),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            schedule.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (space != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              EmojiIcon(
+                                space!.emoji,
+                                size: 14,
+                                color: const Color(0xFF71767B),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                space!.name,
+                                style: const TextStyle(
+                                  color: Color(0xFF71767B),
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      space!.name,
-                      style: const TextStyle(fontSize: 12),
+                      _daysAndTimeLabel(schedule),
+                      style: const TextStyle(
+                        color: Color(0xFF71767B),
+                        fontSize: 11,
+                      ),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if ((schedule.tags).isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: -6,
+                          children: [
+                            for (final t in schedule.tags.take(3))
+                              Text(
+                                '#$t',
+                                style: const TextStyle(
+                                  color: Color(0xFF444B52),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            if (schedule.tags.length > 3)
+                              Text(
+                                '+${schedule.tags.length - 3}',
+                                style: const TextStyle(
+                                  color: Color(0xFF444B52),
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
-            const SizedBox(width: 4),
-            PopupMenuButton<String>(
-              tooltip: 'Routine actions',
-              onSelected: (v) async {
-                if (v == 'edit') {
-                  final updated = await showModalBottomSheet<ScheduleModel>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ManageCategoriesSheet extends StatelessWidget {
+  const _ManageCategoriesSheet({
+    required this.categories,
+    required this.byCat,
+  });
+  final List<RoutineCategoryModel> categories;
+  final Map<String?, List<ScheduleModel>> byCat;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (ctx, scroll) => SingleChildScrollView(
+        controller: scroll,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2F3336),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                const Text(
+                  'Manage categories',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Add category',
+                  icon: const Icon(Icons.add),
+                  onPressed: () async {
+                    final name = await _promptText(context, 'New category');
+                    if (name == null || name.trim().isEmpty) return;
+                    final now = DateTime.now();
+                    final cat = RoutineCategoryModel(
+                      id: now.millisecondsSinceEpoch.toString(),
+                      name: name.trim(),
+                      createdAt: now,
+                      updatedAt: now,
+                    );
+                    await DBProvider.of(context).upsertRoutineCategory(cat);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (categories.isEmpty)
+              const Text(
+                'No categories yet.',
+                style: TextStyle(color: Color(0xFF71767B)),
+              )
+            else
+              ...categories.map(
+                (c) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0A0A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF2F3336)),
+                  ),
+                  child: ListTile(
+                    title: Text(c.name),
+                    subtitle: Text(
+                      '${(byCat[c.id] ?? const []).length} routines',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF71767B),
                       ),
                     ),
-                    builder: (_) => _AddRoutineSheet(initial: s),
-                  );
-                  if (updated != null) {
-                    await DBProvider.of(context).upsertSchedule(updated);
-                  }
-                } else if (v == 'delete') {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete routine?'),
-                      content: const Text('This will remove the routine.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).maybePop(false),
-                          child: const Text('Cancel'),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (v) async {
+                        if (v == 'rename') {
+                          final name =
+                              await _promptText(context, 'Rename category');
+                          if (name == null || name.trim().isEmpty) return;
+                          final now = DateTime.now();
+                          final updated = c.copyWith(
+                            name: name.trim(),
+                            updatedAt: now,
+                          );
+                          await DBProvider.of(context)
+                              .upsertRoutineCategory(updated);
+                        } else if (v == 'delete') {
+                          if ((byCat[c.id] ?? const []).isNotEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Move or delete routines in this category first.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          await DBProvider.of(context)
+                              .deleteRoutineCategory(c.id);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'rename',
+                          child: Text('Rename'),
                         ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          child: const Text('Delete'),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete'),
                         ),
                       ],
                     ),
-                  );
-                  if (ok == true) {
-                    await DBProvider.of(context).deleteSchedule(s.id);
-                  }
-                }
-              },
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 }
+
 
 class _RoutineDetailSheet extends StatelessWidget {
   const _RoutineDetailSheet({required this.schedule, this.space});
