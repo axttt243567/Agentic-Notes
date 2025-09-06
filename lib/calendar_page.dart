@@ -99,7 +99,28 @@ class _CalendarPageState extends State<CalendarPage>
 }
 
 bool _matchesDay(ScheduleModel s, DateTime date) {
-  return s.daysOfWeek.contains(date.weekday);
+  switch (s.recurrence) {
+    case 'date':
+      if ((s.date ?? '').isEmpty) return false;
+      return s.date == _formatYMD(date);
+    case 'range':
+      final start = s.startDate;
+      final end = s.endDate;
+      if (start == null || end == null) return false;
+      final sd = DateTime.tryParse(start);
+      final ed = DateTime.tryParse(end);
+      if (sd == null || ed == null) return false;
+      if (date.isBefore(sd) || date.isAfter(ed)) return false;
+      return s.daysOfWeek.contains(date.weekday);
+    case 'weekly':
+    default:
+      return s.daysOfWeek.contains(date.weekday);
+  }
+}
+
+String _formatYMD(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${d.year}-${two(d.month)}-${two(d.day)}';
 }
 
 class _YearView extends StatefulWidget {
@@ -357,10 +378,10 @@ class _WeeklyOverviewViewState extends State<_WeeklyOverviewView> {
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final dateForSel = today.add(Duration(days: _selectedDay - today.weekday));
     final dayItems =
-        widget.schedules
-            .where((s) => s.daysOfWeek.contains(_selectedDay))
-            .toList()
+        widget.schedules.where((s) => _matchesDay(s, dateForSel)).toList()
           ..sort((a, b) => (a.timeOfDay ?? '').compareTo(b.timeOfDay ?? ''));
 
     return Column(
@@ -562,12 +583,18 @@ class _AddRoutineSheet extends StatefulWidget {
 class _AddRoutineSheetState extends State<_AddRoutineSheet> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _emojiCtrl;
+  late final TextEditingController _descriptionCtrl;
+  late final TextEditingController _tagsCtrl; // comma or # separated
   late Set<int> _days;
   String? _time; // HH:mm
   String? _endTime; // HH:mm
   String? _room;
   String? _selectedCategoryId;
   String? _selectedSpaceId;
+  String _recurrence = 'weekly'; // weekly | date | range
+  DateTime? _singleDate; // for date
+  DateTime? _rangeStart; // for range
+  DateTime? _rangeEnd; // for range
 
   @override
   void initState() {
@@ -575,6 +602,8 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
     final s = widget.initial;
     _titleCtrl = TextEditingController(text: s?.title ?? '');
     _emojiCtrl = TextEditingController(text: s?.emoji ?? '📘');
+    _descriptionCtrl = TextEditingController(text: s?.description ?? '');
+    _tagsCtrl = TextEditingController(text: (s?.tags ?? const []).join(', '));
     _days = {
       ...(s?.daysOfWeek ?? const [1, 2, 3, 4, 5]),
     };
@@ -583,12 +612,26 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
     _room = s?.room;
     _selectedCategoryId = s?.categoryId;
     _selectedSpaceId = s?.spaceId;
+    _recurrence = s?.recurrence ?? 'weekly';
+    if (s?.recurrence == 'date' && (s?.date ?? '').isNotEmpty) {
+      _singleDate = _parseYMD(s!.date!);
+    }
+    if (s?.recurrence == 'range') {
+      if ((s?.startDate ?? '').isNotEmpty) {
+        _rangeStart = _parseYMD(s!.startDate!);
+      }
+      if ((s?.endDate ?? '').isNotEmpty) {
+        _rangeEnd = _parseYMD(s!.endDate!);
+      }
+    }
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _emojiCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _tagsCtrl.dispose();
     super.dispose();
   }
 
@@ -730,26 +773,54 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
               onChanged: (v) => setState(() => _selectedSpaceId = v),
             ),
             const SizedBox(height: 12),
-            const Text('Days of week'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final d in [1, 2, 3, 4, 5, 6, 7])
-                  FilterChip(
-                    label: Text(_weekdayLabel(d)),
-                    selected: _days.contains(d),
-                    onSelected: (sel) => setState(() {
-                      if (sel) {
-                        _days.add(d);
-                      } else {
-                        _days.remove(d);
-                      }
-                    }),
-                  ),
+            DropdownButtonFormField<String>(
+              value: _recurrence,
+              decoration: const InputDecoration(
+                labelText: 'Recurrence',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'weekly',
+                  child: Text('Weekly (days of week)'),
+                ),
+                DropdownMenuItem(value: 'date', child: Text('Specific date')),
+                DropdownMenuItem(
+                  value: 'range',
+                  child: Text('Date range + weekly pattern'),
+                ),
               ],
+              onChanged: (v) => setState(() => _recurrence = v ?? 'weekly'),
             ),
             const SizedBox(height: 12),
+            if (_recurrence == 'date')
+              _buildSingleDatePicker(context)
+            else if (_recurrence == 'range')
+              _buildRangePicker(context)
+            else ...[
+              const Text('Days of week'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final d in [1, 2, 3, 4, 5, 6, 7])
+                    FilterChip(
+                      label: Text(_weekdayLabel(d)),
+                      selected: _days.contains(d),
+                      onSelected: (sel) => setState(() {
+                        if (sel) {
+                          _days.add(d);
+                        } else {
+                          _days.remove(d);
+                        }
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
@@ -812,6 +883,29 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
               ),
               onChanged: (v) => _room = v.trim().isEmpty ? null : v.trim(),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descriptionCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+                hintText: 'Details, notes, objectives...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _tagsCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Tags (comma separated)',
+                hintText: 'e.g., #instructor: GH Mishra, #book: CLRS',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -826,6 +920,103 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSingleDatePicker(BuildContext context) {
+    final label = _singleDate == null
+        ? 'Pick date'
+        : '${_singleDate!.year}-${_two(_singleDate!.month)}-${_two(_singleDate!.day)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              firstDate: DateTime(now.year - 1),
+              lastDate: DateTime(now.year + 3),
+              initialDate: _singleDate ?? now,
+            );
+            if (picked != null) setState(() => _singleDate = picked);
+          },
+          icon: const Icon(Icons.event),
+          label: Text(label),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRangePicker(BuildContext context) {
+    final startLabel = _rangeStart == null
+        ? 'Start date'
+        : '${_rangeStart!.year}-${_two(_rangeStart!.month)}-${_two(_rangeStart!.day)}';
+    final endLabel = _rangeEnd == null
+        ? 'End date'
+        : '${_rangeEnd!.year}-${_two(_rangeEnd!.month)}-${_two(_rangeEnd!.day)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    firstDate: DateTime(now.year - 1),
+                    lastDate: DateTime(now.year + 3),
+                    initialDate: _rangeStart ?? now,
+                  );
+                  if (picked != null) setState(() => _rangeStart = picked);
+                },
+                child: Text(startLabel),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    firstDate: DateTime(now.year - 1),
+                    lastDate: DateTime(now.year + 3),
+                    initialDate: _rangeEnd ?? (_rangeStart ?? now),
+                  );
+                  if (picked != null) setState(() => _rangeEnd = picked);
+                },
+                child: Text(endLabel),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Select days of week within range',
+          style: TextStyle(fontSize: 12, color: Color(0xFF71767B)),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final d in [1, 2, 3, 4, 5, 6, 7])
+              FilterChip(
+                label: Text(_weekdayLabel(d)),
+                selected: _days.contains(d),
+                onSelected: (sel) => setState(() {
+                  if (sel) {
+                    _days.add(d);
+                  } else {
+                    _days.remove(d);
+                  }
+                }),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -850,7 +1041,13 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
   void _submit() {
     final title = _titleCtrl.text.trim();
     final emoji = _emojiCtrl.text.trim().isEmpty ? '📘' : _emojiCtrl.text;
-    if (title.isEmpty || _days.isEmpty) return;
+    if (title.isEmpty) return;
+    if (_recurrence == 'weekly' && _days.isEmpty) return;
+    if (_recurrence == 'range' && (_rangeStart == null || _rangeEnd == null)) {
+      return;
+    }
+    if (_recurrence == 'date' && _singleDate == null) return;
+    final tags = _parseTags(_tagsCtrl.text);
     final now = DateTime.now();
     final model =
         (widget.initial ??
@@ -860,11 +1057,24 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
                   emoji: emoji,
                   spaceId: _selectedSpaceId,
                   categoryId: _selectedCategoryId,
-                  daysOfWeek: _days.toList()..sort(),
+                  daysOfWeek: _recurrence == 'date' ? [] : _days.toList()
+                    ..sort(),
                   timeOfDay: _time,
                   endTimeOfDay: _endTime,
                   durationMinutes: _calcDuration(_time, _endTime),
                   room: _room,
+                  description: _descriptionCtrl.text.trim().isEmpty
+                      ? null
+                      : _descriptionCtrl.text.trim(),
+                  tags: tags,
+                  recurrence: _recurrence,
+                  date: _recurrence == 'date' ? _formatYMD(_singleDate!) : null,
+                  startDate: _recurrence == 'range'
+                      ? _formatYMD(_rangeStart!)
+                      : null,
+                  endDate: _recurrence == 'range'
+                      ? _formatYMD(_rangeEnd!)
+                      : null,
                   createdAt: now,
                   updatedAt: now,
                 ))
@@ -873,15 +1083,49 @@ class _AddRoutineSheetState extends State<_AddRoutineSheet> {
               emoji: emoji,
               spaceId: _selectedSpaceId,
               categoryId: _selectedCategoryId,
-              daysOfWeek: _days.toList()..sort(),
+              daysOfWeek: _recurrence == 'date' ? [] : _days.toList()
+                ..sort(),
               timeOfDay: _time,
               endTimeOfDay: _endTime,
               durationMinutes: _calcDuration(_time, _endTime),
               room: _room,
+              description: _descriptionCtrl.text.trim().isEmpty
+                  ? null
+                  : _descriptionCtrl.text.trim(),
+              tags: tags,
+              recurrence: _recurrence,
+              date: _recurrence == 'date' ? _formatYMD(_singleDate!) : null,
+              startDate: _recurrence == 'range'
+                  ? _formatYMD(_rangeStart!)
+                  : null,
+              endDate: _recurrence == 'range' ? _formatYMD(_rangeEnd!) : null,
               updatedAt: now,
             );
     Navigator.of(context).pop(model);
   }
+
+  List<String> _parseTags(String input) {
+    if (input.trim().isEmpty) return const [];
+    return input
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .map((e) => e.startsWith('#') ? e : e)
+        .toList();
+  }
+
+  String _two(int n) => n.toString().padLeft(2, '0');
+  DateTime? _parseYMD(String ymd) {
+    try {
+      final p = ymd.split('-');
+      if (p.length != 3) return null;
+      return DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatYMD(DateTime d) => '${d.year}-${_two(d.month)}-${_two(d.day)}';
 
   int? _calcDuration(String? start, String? end) {
     if (start == null || end == null) return null;
@@ -1088,6 +1332,17 @@ class _RoutineTile extends StatelessWidget {
           _daysAndTimeLabel(s),
           style: const TextStyle(color: Color(0xFF71767B), fontSize: 12),
         ),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (ctx) => _RoutineDetailSheet(schedule: s, space: space),
+          );
+        },
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1170,18 +1425,215 @@ class _RoutineTile extends StatelessWidget {
   }
 }
 
-String _daysAndTimeLabel(ScheduleModel s) {
-  final days = s.daysOfWeek.map(_weekdayLabel).join(', ');
-  String time;
-  if ((s.timeOfDay ?? '').isEmpty) {
-    time = 'Anytime';
-  } else if ((s.endTimeOfDay ?? '').isEmpty) {
-    time = s.timeOfDay!;
-  } else {
-    time = '${s.timeOfDay}-${s.endTimeOfDay}';
+class _RoutineDetailSheet extends StatelessWidget {
+  const _RoutineDetailSheet({required this.schedule, this.space});
+  final ScheduleModel schedule;
+  final SpaceModel? space;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tags = schedule.tags;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (ctx, scroll) => SingleChildScrollView(
+        controller: scroll,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2F3336),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                EmojiIcon(schedule.emoji, size: 32, color: Colors.white70),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    schedule.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    final updated = await showModalBottomSheet<ScheduleModel>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                      ),
+                      builder: (_) => _AddRoutineSheet(initial: schedule),
+                    );
+                    if (updated != null) {
+                      await DBProvider.of(context).upsertSchedule(updated);
+                    }
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Delete',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (dctx) => AlertDialog(
+                        title: const Text('Delete routine?'),
+                        content: const Text('This will remove the routine.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(dctx).pop(true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok == true) {
+                      await DBProvider.of(context).deleteSchedule(schedule.id);
+                      if (context.mounted) Navigator.of(context).pop();
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _detailRow('Recurrence', _recurrenceLabel(schedule)),
+            if ((schedule.timeOfDay ?? '').isNotEmpty)
+              _detailRow(
+                'Time',
+                (schedule.endTimeOfDay?.isNotEmpty ?? false)
+                    ? '${schedule.timeOfDay}-${schedule.endTimeOfDay}'
+                    : schedule.timeOfDay!,
+              ),
+            if ((schedule.room ?? '').isNotEmpty)
+              _detailRow('Room', schedule.room!),
+            if (space != null) _detailRow('Space', space!.name),
+            if ((schedule.description ?? '').isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Description', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Text(
+                schedule.description!,
+                style: const TextStyle(color: Color(0xFFB0B3B8)),
+              ),
+            ],
+            if (tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Tags', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: -4,
+                children: [
+                  for (final t in tags)
+                    Chip(
+                      label: Text(t),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: const VisualDensity(
+                        horizontal: -4,
+                        vertical: -4,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
   }
-  final room = (s.room ?? '').isEmpty ? null : 'Room ${s.room}';
-  return [days, time, room].whereType<String>().join(' · ');
+
+  Widget _detailRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF71767B),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(value, style: const TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+
+  String _recurrenceLabel(ScheduleModel s) {
+    switch (s.recurrence) {
+      case 'date':
+        return 'On ${s.date ?? '-'}';
+      case 'range':
+        final days = s.daysOfWeek.map(_weekdayLabel).join(',');
+        return 'Range ${s.startDate ?? '-'}→${s.endDate ?? '-'} ($days)';
+      case 'weekly':
+      default:
+        return s.daysOfWeek.map(_weekdayLabel).join(', ');
+    }
+  }
+}
+
+String _daysAndTimeLabel(ScheduleModel s) {
+  final parts = <String>[];
+  switch (s.recurrence) {
+    case 'date':
+      if ((s.date ?? '').isNotEmpty) parts.add(s.date!);
+      break;
+    case 'range':
+      if ((s.startDate ?? '').isNotEmpty && (s.endDate ?? '').isNotEmpty) {
+        parts.add('${s.startDate}→${s.endDate}');
+      }
+      if (s.daysOfWeek.isNotEmpty) {
+        parts.add(s.daysOfWeek.map(_weekdayLabel).join(','));
+      }
+      break;
+    case 'weekly':
+    default:
+      if (s.daysOfWeek.isNotEmpty) {
+        parts.add(s.daysOfWeek.map(_weekdayLabel).join(','));
+      }
+  }
+  if ((s.timeOfDay ?? '').isNotEmpty) {
+    parts.add(
+      (s.endTimeOfDay?.isNotEmpty ?? false)
+          ? '${s.timeOfDay}-${s.endTimeOfDay}'
+          : s.timeOfDay!,
+    );
+  } else {
+    parts.add('Anytime');
+  }
+  if ((s.room ?? '').isNotEmpty) parts.add('Room ${s.room}');
+  if (s.tags.isNotEmpty) parts.add(s.tags.map((e) => '#${e}').join(' '));
+  return parts.join(' · ');
 }
 
 Future<String?> _promptText(BuildContext context, String title) async {

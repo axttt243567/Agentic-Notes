@@ -333,16 +333,58 @@ class _SpaceRoutinesTab extends StatelessWidget {
               color: const Color(0xFF71767B),
             ),
             title: Text(s.title),
-            subtitle: Text(
-              [
-                _formatDays(s.daysOfWeek),
-                if ((s.timeOfDay ?? '').isNotEmpty)
-                  (s.endTimeOfDay?.isNotEmpty ?? false)
-                      ? _formatRange(s.timeOfDay!, s.endTimeOfDay!)
-                      : _formatTime(s.timeOfDay!),
-                if ((s.room ?? '').isNotEmpty) 'Room ${s.room}',
-              ].join(' · '),
-              style: const TextStyle(color: Color(0xFF71767B)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _metaLine(s),
+                  style: const TextStyle(color: Color(0xFF71767B)),
+                ),
+                if ((s.description ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      s.description!,
+                      style: const TextStyle(
+                        color: Color(0xFF71767B),
+                        fontSize: 12,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (s.tags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: -6,
+                      children: [
+                        for (final t in s.tags)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16181A),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFF2F3336),
+                              ),
+                            ),
+                            child: Text(
+                              t,
+                              style: const TextStyle(
+                                color: Color(0xFF71767B),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             trailing: IconButton(
               tooltip: 'Open calendar',
@@ -356,6 +398,33 @@ class _SpaceRoutinesTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _metaLine(ScheduleModel s) {
+    final parts = <String>[];
+    switch (s.recurrence) {
+      case 'date':
+        if ((s.date ?? '').isNotEmpty) parts.add(s.date!);
+        break;
+      case 'range':
+        if ((s.startDate ?? '').isNotEmpty && (s.endDate ?? '').isNotEmpty) {
+          parts.add('${s.startDate}→${s.endDate}');
+        }
+        parts.add(_formatDays(s.daysOfWeek));
+        break;
+      case 'weekly':
+      default:
+        parts.add(_formatDays(s.daysOfWeek));
+    }
+    if ((s.timeOfDay ?? '').isNotEmpty) {
+      parts.add(
+        (s.endTimeOfDay?.isNotEmpty ?? false)
+            ? _formatRange(s.timeOfDay!, s.endTimeOfDay!)
+            : _formatTime(s.timeOfDay!),
+      );
+    }
+    if ((s.room ?? '').isNotEmpty) parts.add('Room ${s.room}');
+    return parts.join(' · ');
   }
 
   String _formatDays(List<int> days) {

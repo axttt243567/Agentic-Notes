@@ -675,6 +675,13 @@ class ScheduleModel {
   final String? endTimeOfDay; // HH:mm (24h) optional end time
   final int? durationMinutes; // optional duration in minutes
   final String? room; // optional classroom identifier
+  // New fields for richer routines
+  final String? description; // long form description / notes
+  final List<String> tags; // free-form tags like #instructor, #book, #room
+  final String recurrence; // 'weekly' | 'date' | 'range' (default weekly)
+  final String? date; // yyyy-MM-dd for single date recurrence
+  final String? startDate; // yyyy-MM-dd for range start
+  final String? endDate; // yyyy-MM-dd for range end
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -689,6 +696,12 @@ class ScheduleModel {
     this.endTimeOfDay,
     this.durationMinutes,
     this.room,
+    this.description,
+    this.tags = const [],
+    this.recurrence = 'weekly',
+    this.date,
+    this.startDate,
+    this.endDate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -704,6 +717,12 @@ class ScheduleModel {
     String? endTimeOfDay,
     int? durationMinutes,
     String? room,
+    String? description,
+    List<String>? tags,
+    String? recurrence,
+    String? date,
+    String? startDate,
+    String? endDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => ScheduleModel(
@@ -717,6 +736,12 @@ class ScheduleModel {
     endTimeOfDay: endTimeOfDay ?? this.endTimeOfDay,
     durationMinutes: durationMinutes ?? this.durationMinutes,
     room: room ?? this.room,
+    description: description ?? this.description,
+    tags: tags ?? this.tags,
+    recurrence: recurrence ?? this.recurrence,
+    date: date ?? this.date,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -732,6 +757,13 @@ class ScheduleModel {
     if (endTimeOfDay != null) 'endTimeOfDay': endTimeOfDay,
     if (durationMinutes != null) 'durationMinutes': durationMinutes,
     if (room != null) 'room': room,
+    if (description != null && description!.isNotEmpty)
+      'description': description,
+    if (tags.isNotEmpty) 'tags': tags,
+    'recurrence': recurrence,
+    if (date != null) 'date': date,
+    if (startDate != null) 'startDate': startDate,
+    if (endDate != null) 'endDate': endDate,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -749,6 +781,14 @@ class ScheduleModel {
     endTimeOfDay: json['endTimeOfDay'] as String?,
     durationMinutes: (json['durationMinutes'] as num?)?.toInt(),
     room: json['room'] as String?,
+    description: json['description'] as String?,
+    tags: ((json['tags'] as List?) ?? const [])
+        .map((e) => e.toString())
+        .toList(growable: false),
+    recurrence: (json['recurrence'] as String?) ?? 'weekly',
+    date: json['date'] as String?,
+    startDate: json['startDate'] as String?,
+    endDate: json['endDate'] as String?,
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ??
         DateTime.fromMillisecondsSinceEpoch(0),

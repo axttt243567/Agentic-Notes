@@ -191,9 +191,8 @@ class _HomePageState extends State<HomePage> {
         ? "Your today's schedule"
         : "Your schedule for ${_formatPretty(_selectedDate)}";
 
-    final dow = _selectedDate.weekday; // 1..7
     final dayItems =
-        _schedules.where((s) => s.daysOfWeek.contains(dow)).toList()
+        _schedules.where((s) => _matchesDayHome(s, _selectedDate)).toList()
           ..sort((a, b) => (a.timeOfDay ?? '').compareTo(b.timeOfDay ?? ''));
 
     return Container(
@@ -484,6 +483,25 @@ class _HomePageState extends State<HomePage> {
     final hour12 = h % 12 == 0 ? 12 : h % 12;
     final mm = m.toString().padLeft(2, '0');
     return '$hour12:$mm$suffix';
+  }
+
+  bool _matchesDayHome(ScheduleModel s, DateTime date) {
+    switch (s.recurrence) {
+      case 'date':
+        return (s.date ?? '') == _formatYMD(date);
+      case 'range':
+        final start = s.startDate;
+        final end = s.endDate;
+        if (start == null || end == null) return false;
+        final sd = DateTime.tryParse(start);
+        final ed = DateTime.tryParse(end);
+        if (sd == null || ed == null) return false;
+        if (date.isBefore(sd) || date.isAfter(ed)) return false;
+        return s.daysOfWeek.contains(date.weekday);
+      case 'weekly':
+      default:
+        return s.daysOfWeek.contains(date.weekday);
+    }
   }
 
   Widget _smartSuggestionsSection(BuildContext context) {
